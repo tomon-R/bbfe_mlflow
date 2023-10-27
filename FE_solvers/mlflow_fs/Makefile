@@ -10,7 +10,7 @@ INCLUDES_BB = -I../../include
 LIBS_BB = -L../../lib -lBB -lBBFE_std -lBBFE_sys -lBBFE_elemmat -lBBFE_manusol
 
 TARGET1 = mlflow_fs
-OBJS1 = mlflow_fs.o mlflow_core.o
+OBJS1 = mlflow_fs.o mlflow_core.o mlflow_elemmat.o
 
 .SUFFIXES: .c .cpp .o
 

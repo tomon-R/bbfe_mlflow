@@ -248,10 +248,10 @@ void set_element_mat_pred(
 				for(int p=0; p<np; p++) {
 					val_ip[p] = 0.0;
 
-					double tau = BBFE_elemmat_fluid_supg_coef(
+					double tau = elemmat_supg_coef(
 							vals->density, vals->viscosity, v_ip[p], h_e, vals->dt);
 
-					val_ip[p] = BBFE_elemmat_fluid_fs_mat_pred_expl(
+					val_ip[p] = elemmat_mat_pred_expl(
 							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau);
 				}
 
@@ -318,11 +318,11 @@ void set_element_vec_pred(
 			double integ_val[3];
 	
 			for(int p=0; p<np; p++) {
-				double tau = BBFE_elemmat_fluid_supg_coef(
+				double tau = elemmat_supg_coef(
 						vals->density, vals->viscosity, v_ip[p], h_e, vals->dt);
 
 				double vec[3];
-				BBFE_elemmat_fluid_fs_vec_pred_expl(
+				elemmat_vec_pred_expl(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
 						v_ip[p], grad_v_ip[p],
 						vals->density, vals->viscosity, tau, vals->dt);
@@ -386,7 +386,7 @@ void set_element_vec_corr(
 			for(int p=0; p<np; p++) {
 				double vec[3];
 				
-				BBFE_elemmat_fluid_fs_vec_corr(
+				elemmat_vec_corr(
 						vec, basis->N[p][i], grad_p_ip[p],
 						v_ip[p], vals->density, vals->dt);
 
@@ -444,7 +444,7 @@ void set_element_vec_ppe(
 
 		for(int i=0; i<nl; i++) {
 			for(int p=0; p<np; p++) {
-				val_ip[p] = BBFE_elemmat_fluid_fs_vec_ppe(
+				val_ip[p] = elemmat_vec_ppe(
 						basis->N[p][i], div_v_ip[p], vals->density, vals->dt);
 			}
 
