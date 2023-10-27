@@ -1,0 +1,30 @@
+# ignore all
+*
+!*/
+
+# allow any
+!*.c
+!*.cpp
+!*.h
+!*.tex
+!*.sty
+!out.sh
+!*.py
+!*makefile
+!*makefile.monolis
+!*makefile.bebopss
+!*Makefile
+!*Macfile
+!.gitignore
+!*plan.txt
+!*tasks.txt
+!*rule.txt
+!*.f90
+!install.sh
+!monolis_update.sh
+!monolis_install.sh
+!util_install.sh
+!docs/*/pics/*.pdf
+
+lib/
+include/

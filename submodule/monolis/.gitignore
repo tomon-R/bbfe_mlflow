@@ -1,0 +1,19 @@
+# ignore all
+*
+!*/
+
+# allow any
+!*.c
+!*.cpp
+!*.h
+!*.tex
+!*.sty
+!*.f90
+!*Makefile
+!.gitignore
+!*.sh
+!submodule
+
+lib
+include
+
