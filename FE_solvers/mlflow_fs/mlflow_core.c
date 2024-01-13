@@ -125,6 +125,17 @@ void BBFE_fluid_renew_velocity(
 	}
 }
 
+void BBFE_fluid_copy_velocity(
+		double**  v_new,
+		double**  v_pre,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++) {
+		for(int d=0; d<3; d++) {
+			v_new[i][d] = v_pre[i][d];
+		}
+	}
+}
 
 void BBFE_fluid_finalize(
 		BBFE_DATA*   fe,
@@ -135,4 +146,51 @@ void BBFE_fluid_finalize(
 
 	BBFE_sys_memory_free_node(fe, 3);
 	BBFE_sys_memory_free_elem(fe, basis->num_integ_points, 3);
+}
+
+void BBFE_fluid_renew_levelset(
+		double* v,
+		double* ans_vec,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++) {
+		v[i] = ans_vec[i];
+	}
+}
+
+void BBFE_fluid_renew_density(
+		double* levelset,
+		double* density,
+		double density_l,
+		double density_g,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++){
+		density[i] = 0.5 * (density_l + density_g) + levelset[i] * (density_l - density_g);
+	}
+}
+
+void BBFE_fluid_renew_viscosity(
+		double* levelset,
+		double* viscosity,
+		double viscosity_l,
+		double viscosity_g,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++){
+		viscosity[i] = 0.5 * (viscosity_l + viscosity_g) + levelset[i] * (viscosity_l - viscosity_g);
+	}
+}
+
+void BBFE_fluid_convert_levelset2heaviside(
+		double* levelset,
+		const double mesh_size,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++) {
+		double h1 = levelset[i]/mesh_size+1/M_PI*sin(M_PI*levelset[i]/mesh_size);
+		if(h1 > 1.0) h1 = 1.0;
+		if(h1 < -1.0) h1 = -1.0;
+		levelset[i] = 0.5 * h1;
+	}
 }
