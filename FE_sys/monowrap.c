@@ -15,7 +15,7 @@ void BBFE_sys_monowrap_init_monomat(
 	monolis_com_initialize_by_parted_files(
 		monolis_com,
 		monolis_mpi_get_global_comm(),
-		MONOLIS_DEFAULT_TOP_DIR,
+		dirname,
 		MONOLIS_DEFAULT_PART_DIR,
 		"node.dat");
 
