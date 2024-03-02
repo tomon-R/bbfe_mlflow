@@ -23,6 +23,10 @@ const char*     ID_VISCOSITY_G  = "#viscosity_g";
 const double  DVAL_VISCOSITY_G  = 1.0;
 const char*         ID_GRAVITY  = "#gravity";
 const double      DVAL_GRAVITY  = 0.0;
+const char*    ID_SURF_TENSION_COEF = "#surf_tension_coef";
+const double DVAL_SURF_TENSION_COEF = 0.0;
+const char*    ID_SIZE_INTERFACE = "#size_interface";
+const double DVAL_SIZE_INTERFACE = 0.1;
 
 const int BUFFER_SIZE = 10000;
 
@@ -55,6 +59,11 @@ typedef struct
 	double*  viscosity;
 
 	double*  levelset;
+
+	double surf_tension_coef;
+	double** surf_tension;
+	double** grad_phi;
+	double size_interface;
 
 } VALUES;
 
@@ -100,6 +109,8 @@ void memory_allocation_nodal_values(
 	vals->density   = BB_std_calloc_1d_double(vals->density, total_num_nodes);
 	vals->viscosity = BB_std_calloc_1d_double(vals->viscosity, total_num_nodes);
 	vals->levelset  = BB_std_calloc_1d_double(vals->levelset, total_num_nodes);
+	vals->surf_tension  = BB_std_calloc_2d_double(vals->surf_tension, total_num_nodes, 3);
+	vals->grad_phi  = BB_std_calloc_2d_double(vals->grad_phi, total_num_nodes, 3);
 }
 
 
@@ -124,6 +135,9 @@ void assign_default_values(
 	vals->gravity[1] = DVAL_GRAVITY;
 	vals->gravity[2] = DVAL_GRAVITY;
 
+	vals->surf_tension_coef = DVAL_SURF_TENSION_COEF;
+
+	vals->size_interface = DVAL_SIZE_INTERFACE;
 }
 
 
@@ -145,6 +159,8 @@ void print_all_values(
 	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_L,        vals->viscosity_l);
 	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_G,        vals->viscosity_g);
 	printf("%s %s: %e %e %e\n", CODENAME, ID_GRAVITY, vals->gravity[0], vals->gravity[1], vals->gravity[2]);
+	printf("%s %s: %e\n", CODENAME, ID_SURF_TENSION_COEF, vals->surf_tension_coef);
+	printf("%s %s: %e\n", CODENAME, ID_SIZE_INTERFACE, vals->size_interface);
 	printf("%s -------------------------------------------\n\n", CODENAME);
 }
 
@@ -192,7 +208,10 @@ void read_calc_conditions(
 				&(vals->viscosity_g), filename, ID_VISCOSITY_G, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
 				vals->gravity, filename, ID_GRAVITY, BUFFER_SIZE, CODENAME);
-
+		num = BB_std_read_file_get_val_double_p(
+				&(vals->surf_tension_coef), filename, ID_SURF_TENSION_COEF, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_double_p(
+				&(vals->size_interface), filename, ID_SIZE_INTERFACE, BUFFER_SIZE, CODENAME);
 		fclose(fp);
 	}
 
@@ -210,11 +229,20 @@ void read_levelset_file(
 {
 	FILE* fp;
 	fp = BBFE_sys_read_fopen(fp, filename, directory);
+	char* label[256];
+	int num;
+
+	// read label
+	BB_std_scan_line(
+			&fp, BUFFER_SIZE, "%s", &(label));
+	printf("%s Label: %s\n", CODENAME, label);
 
 	// read the number of nodes
 	BB_std_scan_line(
-			&fp, BUFFER_SIZE, "%d", &(fe->total_num_nodes));
+			&fp, BUFFER_SIZE, "%d %d", &(fe->total_num_nodes), &(num));
+
 	printf("%s Num. nodes: %d\n", CODENAME, fe->total_num_nodes);
+	printf("%s Num. values per nodes: %d\n", CODENAME, num);
 
 	// read levelset value of nodes
 	for(int i=0; i<(fe->total_num_nodes); i++) {
@@ -235,6 +263,7 @@ void output_result_file_vtk(
 {
 	FILE* fp;
 	fp = BBFE_sys_write_fopen(fp, filename, directory);
+	printf("total_num_nodes: %d\n", fe->total_num_nodes);
 
 	switch( fe->local_num_nodes ) {
 		case 4:
@@ -252,6 +281,7 @@ void output_result_file_vtk(
 	BB_vtk_write_point_vals_scalar(fp, vals->levelset, fe->total_num_nodes, "Levelset");
 	BB_vtk_write_point_vals_scalar(fp, vals->density, fe->total_num_nodes, "Density");
 	BB_vtk_write_point_vals_scalar(fp, vals->viscosity, fe->total_num_nodes, "Viscosity");
+	BB_vtk_write_point_vals_vector(fp, vals->surf_tension, fe->total_num_nodes, "SurfaceTension");
 	fclose(fp);
 
 }
@@ -366,8 +396,10 @@ void set_element_vec_pred(
 	int np = basis->num_integ_points;
 
 	double** val_ip;
+	double** val_ip2;
 	double*  Jacobian_ip;
 	val_ip      = BB_std_calloc_2d_double(val_ip, 3, np);
+	val_ip2      = BB_std_calloc_2d_double(val_ip, 3, np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
 	double** local_v;
@@ -383,10 +415,18 @@ void set_element_vec_pred(
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
 	double* local_density;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
+	double* local_levelset;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double** local_grad_phi;
+	local_grad_phi = BB_std_calloc_2d_double(local_grad_phi, nl, 3);
 	double* viscosity_ip;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
 	double* density_ip;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
+	double* levelset_ip;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
+	double** grad_phi_ip;
+	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
@@ -399,29 +439,38 @@ void set_element_vec_pred(
 
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+		BBFE_elemmat_set_local_array_vector(local_grad_phi, fe, vals->grad_phi, e, 3);
 
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
 			BBFE_std_mapping_vector3d_grad(grad_v_ip[p], nl, local_v, fe->geo[e][p].grad_N);
+			BBFE_std_mapping_vector3d(grad_phi_ip[p], nl, local_grad_phi, basis->N[p]);
+			// for multilayer flow
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
 		}
 
 		for(int i=0; i<nl; i++) {
 			double integ_val[3];
+			double integ_val2[3];
 	
 			for(int p=0; p<np; p++) {
 				double tau = elemmat_supg_coef(
 						density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
 				double vec[3];
+				double surf_tension_vec[3];
 				elemmat_vec_pred_expl(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
 						v_ip[p], grad_v_ip[p],
-						density_ip[p], viscosity_ip[p], tau, vals->dt, vals->gravity);
+						density_ip[p], viscosity_ip[p], tau, vals->dt, vals->gravity,
+						levelset_ip[p], grad_phi_ip[p], vals->surf_tension_coef, surf_tension_vec, vals->size_interface);
 
 				for(int d=0; d<3; d++) {
 					val_ip[d][p] = vec[d];
+					val_ip2[d][p] = surf_tension_vec[d];
 				}
 			}
 
@@ -430,11 +479,17 @@ void set_element_vec_pred(
 						np, val_ip[d], basis->integ_weight, Jacobian_ip);
 
 				monolis->mat.R.B[ 3*fe->conn[e][i] + d ] += integ_val[d];
+
+				// assign surface tension values
+				integ_val2[d] = BBFE_std_integ_calc(
+						np, val_ip2[d], basis->integ_weight, Jacobian_ip);
+				vals->surf_tension[fe->conn[e][i]][d] += integ_val2[d];
 			}
 		}
 	}
 	
 	BB_std_free_2d_double(val_ip, 3, np);
+	BB_std_free_2d_double(val_ip2, 3, np);
 	BB_std_free_1d_double(Jacobian_ip, np);
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
@@ -444,6 +499,11 @@ void set_element_vec_pred(
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(density_ip, np);
 	BB_std_free_1d_double(viscosity_ip, np);
+	
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(levelset_ip, np);
+	BB_std_free_2d_double(local_grad_phi, nl, 3);
+	BB_std_free_2d_double(grad_phi_ip, np, 3);
 }
 
 
@@ -570,7 +630,6 @@ void set_element_vec_ppe(
 
 		for(int p=0; p<np; p++) {
 			div_v_ip[p] = BBFE_std_mapping_vector3d_div(nl, local_v, fe->geo[e][p].grad_N);
-			
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
 		}
@@ -776,8 +835,68 @@ void set_element_vec_levelset(
 	BB_std_free_2d_double(grad_phi_ip, np, 3);
 }
 
+void set_grad_phi_node(
+		MONOLIS*	monolis,
+		BBFE_DATA*	fe,
+		BBFE_BASIS* basis,
+		VALUES*		vals)
+{
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
 
-//*
+	double** val_ip;
+	val_ip      = BB_std_calloc_2d_double(val_ip, 3, np);
+	double*  Jacobian_ip;
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	double* local_levelset;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double** grad_phi_ip;
+	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
+
+	// initialize grad_phi
+	for(int i=0;i<fe->total_num_nodes;i++){
+		for(int d=0;d<3;d++){
+			vals->grad_phi[i][d] = 0;
+		}
+	}
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		double vol = BBFE_std_integ_calc_volume(
+				np, basis->integ_weight, Jacobian_ip);
+		double h_e = cbrt(vol);
+
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+
+		for(int p=0; p<np; p++) {
+			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
+		}
+
+		for(int i=0; i<nl; i++) {
+			for(int d=0;d<3;d++){
+				for(int p=0; p<np; p++) {
+					val_ip[d][p] = grad_phi_ip[p][d];
+				}
+				double integ_val = BBFE_std_integ_calc(
+						np, val_ip[d], basis->integ_weight, Jacobian_ip);
+
+				vals->grad_phi[fe->conn[e][i]][d] += integ_val / vol;
+
+			}
+
+		}
+	}
+	
+	BB_std_free_2d_double(val_ip, 3, np);
+	BB_std_free_1d_double(Jacobian_ip, np);
+
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_2d_double(grad_phi_ip, np, 3);
+}
+
+/*
 void set_element_mat_pred_2step(
 		MONOLIS*     monolis,
 		BBFE_DATA*   fe,
@@ -1040,10 +1159,8 @@ int main(
 	memory_allocation_nodal_values(
 			&(sys.vals),
 			sys.fe.total_num_nodes);
-
 	BBFE_elemmat_set_Jacobi_mat(&(sys.fe), &(sys.basis));
 	BBFE_elemmat_set_shapefunc_derivative(&(sys.fe), &(sys.basis));
-
 	BBFE_sys_monowrap_init_monomat(&(sys.mono_pred) , &(sys.mono_com), &(sys.fe), 3, sys.cond.directory);
 	BBFE_sys_monowrap_init_monomat(&(sys.mono_pred2), &(sys.mono_com), &(sys.fe), 3, sys.cond.directory);
 	BBFE_sys_monowrap_init_monomat(&(sys.mono_ppe)  , &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
@@ -1057,8 +1174,9 @@ int main(
 	BBFE_elemmat_set_global_mat_cmass_const(
 			&(sys.mono_corr0), &(sys.fe), &(sys.basis), 1.0, 3);
 
-	read_levelset_file(&(sys.fe), &(sys.vals), INPUT_FILENAME_LEVELSET, sys.cond.directory);
-	BBFE_fluid_convert_levelset2heaviside(sys.vals.levelset, 0.05, sys.fe.total_num_nodes); // ToDo: mesh sizeを定義する
+	filename = monolis_get_global_input_file_name(MONOLIS_DEFAULT_TOP_DIR, MONOLIS_DEFAULT_PART_DIR, INPUT_FILENAME_LEVELSET);
+	read_levelset_file(&(sys.fe), &(sys.vals), filename, sys.cond.directory);
+	BBFE_fluid_convert_levelset2heaviside(sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
 
 	/****************** solver ********************/
 	double t = 0.0;
@@ -1088,6 +1206,20 @@ int main(
 				sys.vals.v_pre, 
 				sys.vals.v,
 				sys.fe.total_num_nodes);
+
+		// update gradient of phi at nodes
+		set_grad_phi_node(
+				&(sys.mono_pred),
+				&(sys.fe),
+				&(sys.basis),
+				&(sys.vals));
+
+		// clear surface tension vector
+		for(int m=0;m<sys.fe.total_num_nodes;m++){
+			sys.vals.surf_tension[m][0] = 0;
+			sys.vals.surf_tension[m][1] = 0;
+			sys.vals.surf_tension[m][2] = 0;
+		}
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
 		BBFE_fluid_renew_density(

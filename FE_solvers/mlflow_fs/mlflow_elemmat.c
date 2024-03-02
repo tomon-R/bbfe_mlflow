@@ -83,9 +83,30 @@ void elemmat_vec_pred_expl(
 		const double   viscosity,
 		const double   tau,
 		const double   dt, 
-		const double*  gravity)
+		const double*  gravity,
+		const double   phi,
+		const double   grad_phi[3],
+		const double   sigma,
+		double         surf_tension_vec[3],
+		double         size_interface)
 {
 	double dyn_vis = viscosity/density;
+
+	/* calc terms of surface tension */
+	double l_n = BB_calc_vec3d_length(grad_phi);
+	double kappa;
+	if( l_n < ZERO_CRITERION){
+		kappa = 0;
+	}else{
+		kappa = - BB_calc_vec3d_dot(grad_N_i, grad_phi) / l_n;
+	}
+	double delta;
+	double alpha = size_interface;
+	if(abs(phi) < alpha){
+		delta = (1 + cos(M_PI*phi/alpha))/(2*alpha);
+	}else{
+		delta = 0;
+	}
 
 	for(int d=0; d<3; d++) {
 		double val = 0.0;
@@ -142,6 +163,9 @@ void elemmat_vec_pred_expl(
 
 	   	val += N_i * gravity[d];
 
+	   	surf_tension_vec[d] = sigma * kappa * grad_phi[d] / density;
+	   	val += surf_tension_vec[d];
+
 		val *= dt;
 
 		val += N_i * v[d];
@@ -151,7 +175,7 @@ void elemmat_vec_pred_expl(
 		vec[d] = val;
 	}
 }
-
+	
 
 double elemmat_vec_ppe(
 		const double N_i,

@@ -40,7 +40,12 @@ void elemmat_vec_pred_expl(
 		const double viscosity,
 		const double tau,
 		const double dt,
-		const double* gravity);
+		const double* gravity,
+		const double phi,
+		const double grad_phi[3],
+		const double sigma,
+		double       surf_tension_vec[3],
+		const double size_interface);
 
 double elemmat_vec_ppe(
 		const double N_i,
