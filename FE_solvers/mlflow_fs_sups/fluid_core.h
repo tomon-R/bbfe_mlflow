@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mlflow_elemmat.h"
+#include "fluid_elemmat.h"
 
 #include "monolis.h"
 
@@ -56,38 +56,9 @@ void BBFE_fluid_renew_velocity(
 		double*   ans_vec,
 		const int total_num_nodes);
 
-void BBFE_fluid_copy_velocity(
-		double**  v_new,
-		double**  v_pre,
-		const int total_num_nodes);
-
 void BBFE_fluid_finalize(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis);
-
-void BBFE_fluid_renew_levelset(
-		double*  v,
-		double*  ans_vec,
-		const int total_num_nodes);
-
-void BBFE_fluid_renew_density(
-		double* levelset,
-		double* density,
-		double density_l,
-		double density_g,
-		const int total_num_nodes);
-
-void BBFE_fluid_renew_viscosity(
-		double* levelset,
-		double* viscosity,
-		double viscosity_l,
-		double viscosity_g,
-		const int total_num_nodes);
-
-void BBFE_fluid_convert_levelset2heaviside(
-		double* levelset,
-		const double mesh_size,
-		const int total_num_nodes);
 
 void BBFE_fluid_sups_renew_velocity(
 		double**  v,

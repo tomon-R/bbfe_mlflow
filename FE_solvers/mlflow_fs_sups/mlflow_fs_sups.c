@@ -1,5 +1,6 @@
 
-#include "mlflow_core.h"
+#include "mlflow_impfunc.h"
+#include "fluid_core.h"
 
 const char* ID_NUM_IP_EACH_AXIS = "#num_ip_each_axis";
 const int DVAL_NUM_IP_EACH_AXIS = 2;
@@ -52,7 +53,6 @@ typedef struct
 	double viscosity_l, viscosity_g;
 	double* gravity;
 
-	double** v_pre;
 	double** v;
 	double*  p;
 	double*  density;
@@ -98,7 +98,6 @@ void memory_allocation_nodal_values(
 		const int       total_num_nodes)
 {
 	vals->v = BB_std_calloc_2d_double(vals->v, total_num_nodes, 3);
-	vals->v_pre = BB_std_calloc_2d_double(vals->v, total_num_nodes, 3);
 	vals->p = BB_std_calloc_1d_double(vals->p, total_num_nodes);
 	vals->density   = BB_std_calloc_1d_double(vals->density, total_num_nodes);
 	vals->viscosity = BB_std_calloc_1d_double(vals->viscosity, total_num_nodes);
@@ -572,7 +571,7 @@ void set_element_mat_levelset(
 
 					double tau = elemmat_supg_coef_ml(v_ip[p], h_e, vals->dt);
 
-					val_ip[p] = elemmat_mat_pred_expl(
+					val_ip[p] = elemmat_mat_levelset(
 							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau);
 				}
 
@@ -812,11 +811,6 @@ int main(
 		monolis_clear_mat_value_R(&(sys.mono_levelset));
 		monolis_clear_mat_value_rhs_R(&(sys.mono_levelset));
 
-		BBFE_fluid_copy_velocity(
-				sys.vals.v_pre, 
-				sys.vals.v,
-				sys.fe.total_num_nodes);
-
 		// update gradient of phi at nodes
 		set_grad_phi_node(
 				&(sys.fe),
@@ -831,20 +825,21 @@ int main(
 		}
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
-		BBFE_fluid_renew_density(
+		BBFE_fluid_renew_vals_by_levelset(
 				sys.vals.levelset, 
 				sys.vals.density,
 				sys.vals.density_l,
 				sys.vals.density_g,
 				sys.fe.total_num_nodes);
-		BBFE_fluid_renew_viscosity(
+
+		BBFE_fluid_renew_vals_by_levelset(
 				sys.vals.levelset, 
 				sys.vals.viscosity,
 				sys.vals.viscosity_l,
 				sys.vals.viscosity_g,
 				sys.fe.total_num_nodes);
 		
-		printf("%s --- direct solver for velocity and pressure step ---\n", CODENAME);
+		printf("%s --- directly solve velocity and pressure step ---\n", CODENAME);
 		set_element_mat(
 				&(sys.monolis),
 				&(sys.fe),
