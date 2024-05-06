@@ -102,6 +102,10 @@ morecomment=[l]{//}
 	{\Large BBFE mlflowのマニュアル} \\
 \end{center}
 
+\rightline{\today}
+
+本資料は有限要素法とレベルセット法を使用した二層流れ解析プログラムBBFE mlflowの解説資料であり、支配方程式・解法・ソースコード・実行手順・計算例を示す。
+
 \tableofcontents
 
 \newpage
@@ -177,7 +181,7 @@ Galerkin法に基づいて、流速の重み関数$w_{i}$、流速$u_{i}$、中�
 \begin{equation}
 \label{supg-midvel}
 	\begin{split}
-		\int_{\Omega} w_{i}\left( \frac{\tilde{u}-v^{n}_i}{\Delta t} + u^{n}_{j} \frac{\partial u^{n}_{i}}{\partial x_{j}}\right) \; d\Omega \;+ 
+		\int_{\Omega} w_{i}\left( \frac{\tilde{u}-u^{n}_i}{\Delta t} + u^{n}_{j} \frac{\partial u^{n}_{i}}{\partial x_{j}}\right) \; d\Omega \;+ 
 		\int_{\Omega} \frac{1}{\mathrm{Re}} \frac{\partial w_{i}}{\partial x_{j}} \frac{\partial u^{n}_{i}}{\partial x_{j}} \; d\Omega \;+& \\
 		\sum_{e=1}^{M} \int_{\Omega_{e}} \tau_{m} u_{j}^{n} \frac{\partial w_{i}^{h}}{\partial x_{j}} \left( \frac{\tilde{u_{i}} - u_{i}^{n}}{\Delta t} + u_{j}^{n} \frac{\partial u_{i}^{n}}{\partial x_{j}} - \frac{1}{Re} \frac{\partial^{2} u_{i}^{n}}{\partial x_{j}^{2}}\right) \; d\Omega \;=& 
 		\int_{\Gamma_{h}} w_{i}\frac{1}{\mathrm{Re}} \frac{\partial u_{i}}{\partial x_{j}}n_{j} \;d\Gamma
@@ -223,23 +227,22 @@ $\Delta t$は時間刻み幅、$\bm{u}$は流速、$h_e$は要素サイズ、$\m
 
 \newpage
 \section{レベルセット法による自由表面流れの計算}
-自由表面流れとして界面捕捉法の手法であるレベルセット法にを用いた自由表面流れ解析手法について述べる。
+自由表面流れとして界面捕捉法の一種であるレベルセット法を用いた自由表面流れ解析手法について述べる。
 
 \subsection{支配方程式}
 レベルセット法による自由表面流れの支配方程式は、
 Navier-Stokes方程式(\ref{fluid-ns})と連続の式(\ref{fluid-continuum})で表される。
-
 界面捕捉法では解析メッシュは固定メッシュを用いるため、界面を間接的に表現するための関数（界面関数）を導入する。
 界面の支配方程式は以下の移流方程式(\ref{ls-eq})で表される。
 \begin{equation}
 \label{ls-eq}
 	\frac{\partial \phi}{\partial t} + \bm{u} \cdot \nabla \phi = 0 \quad in \quad \Omega
 \end{equation}
-ここで、$\phi$が界面関数、$\bm{u}$は速度である。
-式(\ref{ls-eq})に対してSUPG法に基づく安定化有限要素法を適用し解くことでレベルセット関数が求められる。
+ここで、$\phi$は界面関数、$\bm{u}$は速度ベクトルである。
 
 \subsection{SUPG法による安定化有限要素法}
-式(\ref{ls-eq})にSUPG法を適用すると以下の式(\ref{ls-supg})が得られる。
+式(\ref{ls-eq})に対してSUPG法に基づく安定化有限要素法を適用すると
+以下の式(\ref{ls-supg})が得られる。
 \begin{equation}
 \label{ls-supg}
 		\begin{split}
@@ -248,7 +251,7 @@ Navier-Stokes方程式(\ref{fluid-ns})と連続の式(\ref{fluid-continuum})で�
 		+& \sum^{n_el}_{e=1} \int_{\Omega_{e}} \tau_{LSIC} \nabla \psi^{h} \cdot \nabla \phi^{h} \; d\Omega = 0
 	\end{split}
 \end{equation}
-ここで$\tau_\phi$, $\tau_{LSIC}$はそれぞれ式(\ref{ls-tau_phi}), (\ref{ls-tau_LSIC})に示すSUPG項と衝撃捕捉項のパラメータである。
+ここで$\tau_\phi$, $\tau_{LSIC}$はそれぞれ式(\ref{ls-tau_phi}), (\ref{ls-tau_LSIC})に示すSUPG項と衝撃捕捉項の安定化パラメータである。
 \begin{equation}
 \label{ls-tau_phi}
 	\tau_{\phi} = \left[ \left(\frac{2}{\Delta t} \right)^2 + \left(\frac{2 \| \bm{u}^{h} \|}{h_{e}} \right)^2 \right]^{-1/2}
@@ -274,6 +277,18 @@ Navier-Stokes方程式(\ref{fluid-ns})と連続の式(\ref{fluid-continuum})で�
 	H_{D} = 0.5 \cdot \max \left[-1.0, \min \left(1.0, \frac{\phi}{D} + \frac{1}{\pi} sin\left(\frac{\pi \phi}{D}\right)\right) \right]
 \end{equation}
 
+ここで$D$は界面から平滑化をする幅であり、格子幅の1-5倍程度の値を用いる。
+近似ヘビサイド関数により、密度および粘性係数は次式(\ref{ls-rho}), (\ref{ls-mu})のように表される。
+\begin{equation}
+\label{ls-rho}
+	\rho = 0.5 (\rho_l + \rho_g) + H_{D} (\rho_l - \rho_g)
+\end{equation}
+\begin{equation}
+\label{ls-mu}
+	\mu = 0.5 (\mu_l + \mu_g) + H_{D} (\mu_l - \mu_g)
+\end{equation}
+
+
 \subsection{表面張力}
 表面張力$\bm{f}_{fs}$とすると、CSF(Continuum Surface Force)モデルにより次式(\ref{sf-eq})のように算定できる。
 \begin{equation}
@@ -291,11 +306,10 @@ Navier-Stokes方程式(\ref{fluid-ns})と連続の式(\ref{fluid-continuum})で�
 \label{sf-kappa}
 	\kappa = - \nabla \cdot \bm{n}_{s}
 \end{equation}
-式(\ref{sf-eq})で求められた表面張力$\bm{f}_{fs}$はNavier-Stokes方程式(\ref{fluid-ns})の体積力として作用させる。
-
-ここで、表面張力の計算式には2階微分が含まれるので線形近似では要素内で値が0になってしまう問題がある。
+式(\ref{sf-eq})で求められる表面張力$\bm{f}_{fs}$はNavier-Stokes方程式(\ref{fluid-ns})において体積力として作用させる。
+ここで、表面張力の計算式(\ref{sf-eq})には2階微分が含まれるので線形近似では要素内で値が0になってしまう問題がある。
 L2プロジェクションによる計算\cite{Nagrath2003}や、1階微分の値を各節点に振り分けてから1次要素で補間する方法\cite{Matsumoto2006}, \cite{Shi2019}が提案されている。
-今回は、1階微分の値を各節点に振り分けてから1次要素で補間する方法で計算した。
+今回は、1階微分の値を各節点に振り分けてから1次要素で補間する方法で実装した。
 
 \newpage
 \section{ソースコード解説}
@@ -305,7 +319,7 @@ L2プロジェクションによる計算\cite{Nagrath2003}や、1階微分の�
 自由表面流れ解析プログラムが実装されているディレクトリ構成とファイルを以下に示す。
 
 \begin{itemize}
-	\item FE\_solvers : 種々の問題のソルバーが存在するディレクトリ
+	\item FE\_solvers : 解析ソルバーが存在するディレクトリ
   \begin{itemize}
     \item mlflow\_fs : 自由表面流れ解析の実装ファイルをまとめたディレクトリ
     \begin{itemize}
@@ -682,9 +696,79 @@ double elemmat_vec_levelset(
 }
 \end{lstlisting}
 
+以下に、流体の中間流速を求める計算式(\ref{matrix-midvel})の右辺ベクトルを計算する関数を示す。表面張力も外力項として計算している。
+\begin{lstlisting}[caption = mlflow\_element.cの中間流速の右辺ベクトルの計算]
+void elemmat_vec_pred_expl(
+		double         vec[3],
+		const double   N_i,
+		const double   grad_N_i[3],
+		const double   v[3],
+		double**       grad_v,
+		const double   density,
+		const double   viscosity,
+		const double   tau,
+		const double   dt, 
+		const double*  gravity,
+		const double   phi,
+		const double   grad_phi[3],
+		const double   sigma,
+		double         surf_tension_vec[3],
+		double         size_interface)
+{
+	double dyn_vis = viscosity/density;
+
+	/* calc terms of surface tension */
+	double l_n = BB_calc_vec3d_length(grad_phi);
+	double kappa;
+	if( l_n < ZERO_CRITERION){
+		kappa = 0;
+	}else{
+		kappa = - BB_calc_vec3d_dot(grad_N_i, grad_phi) / l_n;
+	}
+	double delta;
+	double alpha = size_interface;
+	if(abs(phi) < alpha){
+		delta = (1 + cos(M_PI*phi/alpha))/(2*alpha);
+	}else{
+		delta = 0;
+	}
+
+	for(int d=0; d<3; d++) {
+		double val = 0.0;
+		
+		val += -N_i * ( 
+				 v[0]*grad_v[d][0] + 
+				 v[1]*grad_v[d][1] + 
+				 v[2]*grad_v[d][2] 
+				 );
+
+		val += -dyn_vis * ( 
+				 grad_N_i[0]*grad_v[d][0] +
+				 grad_N_i[1]*grad_v[d][1] +
+				 grad_N_i[2]*grad_v[d][2] 
+				 );
+
+	   	val += -tau * BB_calc_vec3d_dot(v, grad_N_i) * BB_calc_vec3d_dot(v, grad_v[d]);
+
+	   	val += N_i * gravity[d];
+
+	   	surf_tension_vec[d] = sigma * kappa * grad_phi[d] / density;
+	   	val += surf_tension_vec[d];
+
+		val *= dt;
+
+		val += N_i * v[d];
+
+		val += tau * BB_calc_vec3d_dot(v, grad_N_i) * v[d];
+
+		vec[d] = val;
+	}
+}
+\end{lstlisting}
+
 \subsection{mlflow\_core.c}
 mlflow\_core.cに含まれる関数のうち、二層流れに関連する関数として、
-レベルセット関数を近似Heaviside関数による平滑化する式(\ref{ls-heaviside})を計算する関数と、レベルセット関数をもとに密度と粘性を計算する関数を示す。
+レベルセット関数を近似Heaviside関数による平滑化する式(\ref{ls-heaviside})を計算する関数と、密度と粘性の計算式(\ref{ls-rho}), (\ref{ls-mu})を計算する関数を示す。
 
 \begin{lstlisting}[caption = mlflow\_core.cのレベルセット関数の近似Heaviside関数による平滑化計算]
 void BBFE_fluid_convert_levelset2heaviside(
@@ -815,8 +899,8 @@ cond.datのフォーマットの一例は以下の通り。"\#(ラベル) (変�
 \subsection{解析実行手順}
 \subsubsection{入力ファイルの作成}
 
-utilディレクトリには入力ファイルの作成などに役立つプログラムがあり、これら使うことでメッシュファイルや境界条件を作成することが可能である。
-以下に3次元の気泡上昇問題のモデルの作成例を示す。
+utilディレクトリには入力ファイルを自動で作成可能なプログラムがあり、これら使うことで計算領域のメッシュファイルや境界条件ファイルを作成できる。
+以下に3次元の気泡上昇流れ問題のモデルの作成例を示す。
 \begin{lstlisting}[]
 #!/bin/bash
 
@@ -837,6 +921,13 @@ cd ./workspace/3d-bubble
 ../../surface/surf_dbc 1 0.0 -ie surf_p.dat -o D_bc_p.dat
 # 速度の Dirichlet B.C. ファイル (流入境界および slip 境界) を作成
 ../../surface/surf_dbc 3 0.0 0.0 0.0 -ie surf_v.dat -o D_bc_v.dat
+
+# レベルセット関数のlevelset.dat ファイルの作成
+# 以下の引数6個はlevelset.datファイルの計算には使用しないため何でもよい。仮で0としている
+../../mesh/levelset_gen 0 0 0 0 0 0
+
+# 以上でnode.dat, elem.dat, D_bc_v.dat, D_bc_p.dat, levelset.datファイルが作成された
+# FE_solverディレクトリに移動し、計算実行フォルダを作成しその中にこれらの入力ファイルをコピーする
 \end{lstlisting}
 
 \subsubsection{解析実行}
@@ -844,9 +935,14 @@ cd ./workspace/3d-bubble
 以下に解析実行例を示す。解析作業ディレクトリ（以下では"3d-bubble"）を作成し、そこに必要な入力ファイルを格納し、解析実行コマンドの引数に解析ディレクトリのパスを指定することで解析実行される。出力ファイルも解析作業ディレクトリに生成される。
 \begin{lstlisting}[]
 #!/bin/bash
+# 解析実行ディレクトリに移動
 cd ../../.../FE_solver/mlflow_fs
+# 入力データと出力データを入れるフォルダを作成
 mkdir 3d-bubble
 
+# 入力データを上記フォルダに格納する
+
+# 計算実行
 ./mlflow_fs ./3d-bubble
 \end{lstlisting}
 
@@ -869,7 +965,7 @@ cd ../../.../FE_solver/mlflow_fs
 # levelset.datを分割
 ../../../submodule/monolis/bin/gedatsu_dist_val_partitioner_R -ig node.dat -i levelset.dat -n 2
 
-# 並列実行
+# 並列計算実行
 mpirun -np 2 ./mlflow_fs ./damBreak-parallel/
 
 \end{lstlisting}
@@ -879,8 +975,16 @@ mpirun -np 2 ./mlflow_fs ./damBreak-parallel/
 二層流解析を導入したプログラムに対して、二つの流体が同じパラメータの場合に単層の流れの結果と同じになることをキャビティ流れを解くことにより検証した。
 
 \subsection{解析条件}
-Table \ref{table:fluid-ml-cavity-parameter}に解析パラメータを示す。
+Figure \ref{fig:3d-cavity-mesh}に解析メッシュを示す。メッシュは四面体$1$次要素を使用した。解析領域の大きさは$[0, 1]\times[0,1]\times[0,1]$である。上面に速度のディリクレ境界条件として$u_{y}=1.0$を与えて、それ以外の面には滑りなし境界条件を与えている。
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=10truecm]{pics/3d-cavity/mesh.pdf}
+	\caption{解析領域のメッシュ}
+	\label{fig:3d-cavity-mesh}
+\end{figure}
 
+Table \ref{table:fluid-ml-cavity-parameter}に解析パラメータを示す。
+$z=0.5$の面を境界として$z<0.5$の領域を流体1、$z>0.5$の領域を流体2としている。
 \renewcommand{\arraystretch}{1}
 \begin{table}[H]
 	\centering
@@ -897,18 +1001,21 @@ Table \ref{table:fluid-ml-cavity-parameter}に解析パラメータを示す。
 \renewcommand{\arraystretch}{1.0}
 
 \subsection{解析結果}
+
+Figure \ref{fig:3d-cavity-result-levelset}にレベルセット関数の時間変化を示す。
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=18truecm]{pics/3d-cavity/levelset_velocity.pdf}
-	\caption{二層キャビティ流れのレベルセット関数の時間変化}
-	\label{fig:3d-bubble-levelset_t0-3}
+	\caption{二層キャビティ流れのレベルセット関数の時間変化($x=0.5$における断面)}
+	\label{fig:3d-cavity-result-levelset}
 \end{figure}
 
+Figure \ref{fig:3d-cavity-result-velocity-pressure}に流速と圧力分布の結果を示す。
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=18truecm]{pics/3d-cavity/velocity_pressure.pdf}
-	\caption{二層キャビティ流れの速度と圧力分布$(T=30.0)$}
-	\label{fig:3d-bubble-levelset_t0-3}
+	\caption{二層キャビティ流れの速度と圧力分布($x=0.5$における断面)}
+	\label{fig:3d-cavity-result-velocity-pressure}
 \end{figure}
 
 \begin{figure}[H]
@@ -918,7 +1025,7 @@ Table \ref{table:fluid-ml-cavity-parameter}に解析パラメータを示す。
 	\label{fig:3d-cavity_velocity_graph}
 \end{figure}
 
-Figure \ref{fig:3d-cavity_velocity_graph}より、単層流の場合と二層流の場合で速度分布が一致しており、参考文献\cite{Lo2005}との結果もよく一致していることがわかるため、プログラムの妥当性を検証できた。
+Figure \ref{fig:3d-cavity_velocity_graph}より、単層流の場合と二層流の場合で速度分布が一致しており、また参考文献\cite{Lo2005}の結果ともよく一致しているため、プログラムの妥当性を検証できた。
 
 \newpage
 \section{3次元のダムブレイク問題}
@@ -927,6 +1034,7 @@ Figure \ref{fig:3d-cavity_velocity_graph}より、単層流の場合と二層流
 \subsection{解析条件}
 
 Table \ref{table:dambreak-material-property}に二つの流体の物性値を示す。
+Case1は水と空気と同じオーダーの密度と粘性の値であり、Case2は流体2の密度$\rho_2$と粘性$\mu_2$をそれぞれ10倍したパラメータである。
 \renewcommand{\arraystretch}{1}
 \begin{table}[H]
 	\centering
@@ -943,14 +1051,16 @@ Table \ref{table:dambreak-material-property}に二つの流体の物性値を示
 \end{table}
 \renewcommand{\arraystretch}{1.0}
 
-Table \ref{table:dambreak-parameter}に解析パラメータを示す。
+Table \ref{table:dambreak-parameter}に解析における設定パラメータを示す。
+界面幅$D$は、近似ヘビサイド関数よる平滑化の計算式(\ref{ls-heaviside})に含まれるパラメータである。
+Case1と2では$D$の値が異なり、Case2の方がCase1よりも界面が平滑化される。
 \renewcommand{\arraystretch}{1}
 \begin{table}[H]
 	\centering
 	\caption{解析パラメータ}
 	\begin{tabular}{cccc}
 		\hline
-		Test case & $\Delta t$ & メッシュ幅$dx$ & ヘビサイド関数パラメータ$D$\\
+		Test case & $\Delta t$ & メッシュ幅$dx$ & 界面幅$D$\\
 		\hline 
 		Case$1$ & $0.0001$ & $0.05$ & $0.05$\\
 		Case$2$ & $0.0001$ & $0.05$ & $0.15$\\
@@ -960,7 +1070,7 @@ Table \ref{table:dambreak-parameter}に解析パラメータを示す。
 \end{table}
 \renewcommand{\arraystretch}{1.0}
 
-Figure \ref{fig:3d-dambreak-mesh}に解析用のメッシュを示す。メッシュは六面体$1$次要素である。
+Figure \ref{fig:3d-dambreak-mesh}に解析用のメッシュを示す。メッシュは六面体$1$次要素を使用した。
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=18truecm]{pics/3d-dambreak/mesh.pdf}
@@ -968,17 +1078,22 @@ Figure \ref{fig:3d-dambreak-mesh}に解析用のメッシュを示す。メッ�
 	\label{fig:3d-dambreak-mesh}
 \end{figure}
 
+Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数と、境界条件を示す。
+fractional step法では全面にno-slip境界条件を与えたときに圧力のディリクレ境界条件がないため、初期ステップで圧力ポアソン方程式の計算で計算が破綻する場合があり、今回も全面no-slip境界条件では計算が破綻したため、上面のみ流出境界条件として$p=0$の圧力のディリクレ境界条件を与えている。
+また、流出境界条件の$p=0$は近似的な与え方であるため、流出境界に起因する不安定性も生じる可能性があり、計算領域を$z$方向に大きめに取ることで流出境界条件の影響を低減させている。
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=18truecm]{pics/3d-dambreak/levelset_init.pdf}
 	\caption{ダムブレイクの初期のレベルセット関数と境界条件}
-	\label{fig:3d-dambreak-mesh}
+	\label{fig:3d-dambreak-boundary}
 \end{figure}
 
 \subsection{解析結果}
 
-物性値Case$1$の水と空気の物性値のオーダーでは計算が発散してしまう。解析パラメータ$1$, $2$でも同様に発散する。
-物性値Case$2$の水と空気(の密度と粘性係数が10倍）の物性値のオーダーでは、解析パラメータ$1$では発散し、$2$でヘビサイド関数の$D$を大きく取ることで安定化した。
+Figure \ref{fig:3d-dambreak-diverge}に示すように、
+物性値Case$1$の水と空気の物性値のオーダーでは計算が発散する結果となった。
+Case1の場合はTable \ref{table:dambreak-parameter}の界面の厚さを変えた解析パラメータ$1$, $2$のどちらでも発散した。
+初期で圧力が振動しており、二層流の界面の影響というよりは、流体ソルバーのfractional step法での圧力の安定化項が入っていないことによる不安定性と考えられる。
 
 \begin{figure}[H]
 	\centering
@@ -987,15 +1102,18 @@ Figure \ref{fig:3d-dambreak-mesh}に解析用のメッシュを示す。メッ�
 	\label{fig:3d-dambreak-diverge}
 \end{figure}
 
+物性値Case$2$の水と空気(の密度と粘性係数が10倍）の物性値のオーダーでは、Table \ref{table:dambreak-parameter}の解析パラメータ$1$では発散し、$2$でヘビサイド関数の$D$を大きく取ることで安定化し解析できた。その結果をFigure \ref{fig:3d-dambreak-result}に示す。界面幅が小さいほど不連続性が高まり不安定になるが、界面幅が大きいほど不連続性が滑らかになるため安定化したと考えられる。
+
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=18truecm]{pics/3d-dambreak/levelset_velocity.pdf}
 	\caption{ダムブレイク問題のCase2の計算結果における速度と圧力分布（$y=0.4$における断面）。Case2の物性値の差が小さい場合ではヘビサイド関数Dの値を大きくすることで安定に計算可能となった。}
-	\label{fig:3d-dambreak-diverge}
+	\label{fig:3d-dambreak-result}
 \end{figure}
 
 \subsection{並列解析結果}
-ここでは、3.5項で示した並列化解析実行手順に従い並列数を4として並列解析をした結果を示す。
+本ソルバーは領域分割法によるMPI並列化にも対応しているため、
+3.5項で示した並列化解析実行手順に従い並列数を4として並列解析をした結果を示す。
 Figure \ref{fig:3d-dambreak-parallel-partition}に領域分割したメッシュを示す。
 
 \begin{figure}[H]
@@ -1007,6 +1125,7 @@ Figure \ref{fig:3d-dambreak-parallel-partition}に領域分割したメッシュ
 
 Figure \ref{fig:3d-dambreak-parallel-result}に速度分布、圧力分布、レベルセット関数の結果を示す。
 並列化なしの場合と同様の結果が得られており、並列化解析が問題なくできていることが確認できた。
+計算時間についても大幅に短くなっているが、時間計測は今回は行っていないため、今後スケーリング効果の計測を実施する。
 
 \begin{figure}[H]
 	\centering
@@ -1016,10 +1135,13 @@ Figure \ref{fig:3d-dambreak-parallel-result}に速度分布、圧力分布、レ
 \end{figure}
 
 \newpage
-\section{3次元の気泡上昇問題}
-3次元の解析の定量的な精度検証として、気泡上昇問題を解析し、参考文献の結果と比較した。
+\section{3次元の気泡上昇流れ問題}
+
+二層流の別のベンチマーク問題として3次元の気泡上昇流れ問題を解析し、参考文献の結果と比較した。
+
 \subsection{解析条件}
-Table \ref{table:3d-bubble-material-property}に物性値を示す。
+
+Table \ref{table:3d-bubble-material-property}に二つの流体の物性値、Table \ref{table:3d-bubble-parameter}に解析パラメータを示す。
 
 \renewcommand{\arraystretch}{1}
 \begin{table}[H]
@@ -1027,24 +1149,22 @@ Table \ref{table:3d-bubble-material-property}に物性値を示す。
 	\caption{解析パラメータ}
 	\begin{tabular}{ccccccc}
 		\hline
-		Test case & $\rho_1$ & $\rho_2$ & $\mu_1$ & $\mu_2$ & $\mathrm{g}$ & $\sigma$\\
+		Test case & $\rho_1$ & $\rho_2$ & $\mu_1$ & $\mu_2$ & $\mathrm{g}$\\
 		\hline 
-		Case$1$ & $1000$ & $100$ & $10$ & $1$   & $0.98$ & $24.5$ \\
-		Case$2$ & $1000$ & $1$   & $10$ & $0.1$ & $0.98$ & $1.96$ \\
+		Case$1$ & $1000$ & $100$ & $10$ & $1$   & $0.98$ \\
 		\hline         
 	\end{tabular}
 	\label{table:3d-bubble-material-property}
 \end{table}
 \renewcommand{\arraystretch}{1.0}
 
-Table \ref{table:3d-bubble-parameter}に解析パラメータを示す。
 \renewcommand{\arraystretch}{1}
 \begin{table}[H]
 	\centering
 	\caption{解析パラメータ}
 	\begin{tabular}{ccc}
 		\hline
-		Test case & メッシュ幅$dx$ & ヘビサイド関数パラメータ$D$\\
+		Test case & メッシュ幅$dx$ & 界面幅$D$\\
 		\hline 
 		Case$1$ & $0.05$ & $0.05$\\
 		\hline         
@@ -1053,6 +1173,8 @@ Table \ref{table:3d-bubble-parameter}に解析パラメータを示す。
 \end{table}
 \renewcommand{\arraystretch}{1.0}
 
+Figure \ref{fig:3d-bubble-setting}に文献\cite{Safi2017}から引用した解析領域の図を示す。
+
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=10truecm]{pics/3d-bubble/setting.pdf}
@@ -1060,7 +1182,7 @@ Table \ref{table:3d-bubble-parameter}に解析パラメータを示す。
 	\label{fig:3d-bubble-setting}
 \end{figure}
 
-Figure \ref{fig:3d-bubble-mesh}に解析用のメッシュを示す。メッシュは四面体$1$次要素である。
+Figure \ref{fig:3d-bubble-mesh}に解析用のメッシュを示す。メッシュは四面体$1$次要素を使用した。境界条件はダムブレイク問題と同様に上面を流出境界条件として圧力のディリクレ境界条件$p=0$、それ以外の面を滑りなし壁境界とした。
 
 \begin{figure}[H]
 	\centering
@@ -1069,7 +1191,7 @@ Figure \ref{fig:3d-bubble-mesh}に解析用のメッシュを示す。メッシ�
 	\label{fig:3d-bubble-mesh}
 \end{figure}
 
-Figure \ref{fig:3d-bubble-levelset_t0_3d}に初期状態のレベルセット関数を示す。
+Figure \ref{fig:3d-bubble-levelset_t0_3d}に初期状態のレベルセット関数を示す。白い球面が界面である。
 
 \begin{figure}[H]
 	\centering
@@ -1079,11 +1201,8 @@ Figure \ref{fig:3d-bubble-levelset_t0_3d}に初期状態のレベルセット関
 \end{figure}
 
 \subsection{解析結果}
-
-Figure \ref{fig:3d-bubble-result_sigma0}は表面張力を導入する前の表面張力係数$\sigma=0$の場合の結果である。Figure　\ref{fig:3d-bubble-result-ref}の参考文献の結果と比較すると形が大きく変形してしまっていることがわかる。
-表面張力の有無による差と考え、表面張力のモデルを導入し計算した結果を示す。
-Figure \ref{fig:3d-bubble_result_sigma24.5}は文献と同じ表面張力係数$\sigma=24.5$を使用したが、形が崩れていってしまう結果となった。
-Figure \ref{fig:3d-bubble_result_sigma9.8}, \ref{fig:3d-bubble_result_sigma4.9}にそれぞれ係数$\sigma$を$9.8, 4.9$と小さくした場合の結果を示す。\ref{fig:3d-bubble_result_sigma4.9}の場合の$T=1.5$と\ref{fig:3d-bubble-result_sigma0}の$T=1.5$を比較すると表面張力によって初期の変形が抑えられており、表面張力の導入の効果は見られるが、参考文献の形状とは差があり、係数を大きくした場合の変形の不安定性を抑えることが課題である。
+\subsubsection{表面張力なしの場合の解析結果}
+Figure \ref{fig:3d-bubble-result_sigma0}は表面張力を導入する前の表面張力係数$\sigma=0$の場合の結果である。Figure \ref{fig:3d-bubble-result-ref}の参考文献の結果と比較すると形が大きく変形してしまっていることがわかる。
 
 \begin{figure}[H]
 	\centering
@@ -1094,38 +1213,43 @@ Figure \ref{fig:3d-bubble_result_sigma9.8}, \ref{fig:3d-bubble_result_sigma4.9}�
 
 \begin{figure}[H]
 	\centering
+	\includegraphics[width=10truecm]{pics/3d-bubble/result-ref.pdf}
+	\caption{参考文献結果($\sigma=24.5$)\cite{Safi2017}}
+	\label{fig:3d-bubble-result-ref}
+\end{figure}
+
+\subsubsection{表面張力ありの場合の解析結果}
+気泡上昇流れ問題においては表面張力の影響は大きいと思われるため、表面張力のモデルを導入し計算した結果を示す。
+Figure \ref{fig:3d-bubble_result_sigma24.5}は$\sigma=1.225$の結果である。矢印で表面張力をベクトルで表示している。初期は放射状に力がかかっており定性的には適切に計算できていると考えられるが、計算が進むにつれて形が崩れていってしまう結果となった。
+Figure \ref{fig:3d-bubble_result_sigma9.8}, \ref{fig:3d-bubble_result_sigma4.9}にそれぞれ係数$\sigma$を$0.49, 0.245$と小さくした場合の結果を示す。Figure \ref{fig:3d-bubble_result_sigma4.9}の場合の$T=1.5$とFigure \ref{fig:3d-bubble-result_sigma0}の$T=1.5$を比較すると表面張力によって初期の変形が抑えられており、表面張力の導入の効果は見られるが、参考文献は$\sigma=24.5$で計算しており、係数を大きくした場合の変形の不安定性を抑えることが課題である。
+
+\begin{figure}[H]
+	\centering
 	\includegraphics[width=18truecm]{pics/3d-bubble/result_sigma24_5.pdf}
-	\caption{3次元気泡上昇流れのレベルセット関数の分布の時間変化（$\sigma=24.5$、表面張力あり）。カラーバーの範囲は$-0.01$～$+0.01$として界面の位置を見やすくしている。}
+	\caption{3次元気泡上昇流れのレベルセット関数の分布の時間変化（$\sigma=1.225$、表面張力あり）。カラーバーの範囲は$-0.01$～$+0.01$として界面の位置を見やすくしている。}
 	\label{fig:3d-bubble_result_sigma24.5}
 \end{figure}
 
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=18truecm]{pics/3d-bubble/result_sigma9_8.pdf}
-	\caption{3次元気泡上昇流れのレベルセット関数の分布の時間変化（$\sigma=9.8$、表面張力あり）。カラーバーの範囲は$-0.01$～$+0.01$として界面の位置を見やすくしている。}
+	\caption{3次元気泡上昇流れのレベルセット関数の分布の時間変化（$\sigma=0.49$、表面張力あり）。カラーバーの範囲は$-0.01$～$+0.01$として界面の位置を見やすくしている。}
 	\label{fig:3d-bubble_result_sigma9.8}
 \end{figure}
 
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=18truecm]{pics/3d-bubble/result_sigma4_9.pdf}
-	\caption{3次元気泡上昇流れのレベルセット関数の分布の時間変化（$\sigma=4.9$、表面張力あり）。カラーバーの範囲は$-0.01$～$+0.01$として界面の位置を見やすくしている。}
+	\caption{3次元気泡上昇流れのレベルセット関数の分布の時間変化（$\sigma=0.245$、表面張力あり）。カラーバーの範囲は$-0.01$～$+0.01$として界面の位置を見やすくしている。}
 	\label{fig:3d-bubble_result_sigma4.9}
 \end{figure}
 
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=10truecm]{pics/3d-bubble/result-ref.pdf}
-	\caption{参考文献結果~\cite{Safi2017}}
-	\label{fig:3d-bubble-result-ref}
-\end{figure}
-
 \begin{thebibliography}{99}
-	\bibitem{Safi2017} Safi, M. A., Prasianakis, N. \& Turek, S. Benchmark computations for 3D two-phase flows: A coupled lattice Boltzmann-level set study. Comput. Math. Appl. 73, 520–536 (2017)
 	\bibitem{Nagrath2003} Nagrath, S., Jansen, K. \& Lahey, R. T. Three Dimensional Simulation of Incompressible Two-phase Flows using a stabilized finite element method and level set approach. in vol. 56 KF.002 (2003)
 	\bibitem{Matsumoto2006} 松本純一, 鈴木健 \& 手塚明. 気泡関数要素安定化法を用いた気液二相流解析. 混相流研究の進展 1, 181–188 (2006)
 	\bibitem{Shi2019} Shi, J., Barriere, T., Liu, B. \& Cheng, Z. A simple and systematic scheme implemented in explicit FEM solver for surface tension effects in powder injection moulding process. Int. J. Mater. Form. 12, 123–134 (2019)
 	\bibitem{Lo2005} Lo, D. C., Murugesan, K. \& Young, D. L. Numerical solution of three-dimensional velocity-vorticity Navier-Stokes equations by finite difference method. International Journal for Numerical Methods in Fluids vol. 47 1469–1487 Preprint at https://doi.org/10.1002/fld.822 (2005)
+	\bibitem{Safi2017} Safi, M. A., Prasianakis, N. \& Turek, S. Benchmark computations for 3D two-phase flows: A coupled lattice Boltzmann-level set study. Comput. Math. Appl. 73, 520–536 (2017)
 \end{thebibliography}
 
 \end{document}
