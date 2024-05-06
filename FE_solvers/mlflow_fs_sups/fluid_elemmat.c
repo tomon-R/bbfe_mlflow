@@ -134,7 +134,8 @@ void BBFE_elemmat_fluid_sups_vec(
 		const double   density,
 		const double   tau,
 		const double   dt,
-		const double*  gravity)
+		const double*  gravity,
+		double*  surf_tension)
 {
 	for(int d=0; d<3; d++) {
 		double val = 0.0;
@@ -143,7 +144,9 @@ void BBFE_elemmat_fluid_sups_vec(
 
 		val += density * tau * BB_calc_vec3d_dot(v, grad_N_i) * v[d];
 
-		val += density * N_i * gravity[d] * dt; // gravity term
+		val += density * N_i * gravity[d] * dt;
+
+		val += surf_tension[d];
 
 		vec[d] = val;
 	}

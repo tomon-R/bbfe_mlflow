@@ -443,8 +443,10 @@ void set_element_vec(
 	int np = basis->num_integ_points;
 
 	double** val_ip;
+	double** surf_tension_ip;
 	double*  Jacobian_ip;
 	val_ip      = BB_std_calloc_2d_double(val_ip, 4, np);
+	surf_tension_ip = BB_std_calloc_2d_double(val_ip, 3, np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
 	double** local_v;
@@ -457,10 +459,19 @@ void set_element_vec(
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
 	double* local_density;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
+	double* local_levelset;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double** local_grad_phi;
+	local_grad_phi = BB_std_calloc_2d_double(local_grad_phi, nl, 3);
+
 	double* viscosity_ip;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
 	double* density_ip;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
+	double* levelset_ip;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
+	double** grad_phi_ip;
+	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
@@ -473,11 +484,16 @@ void set_element_vec(
 
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+		BBFE_elemmat_set_local_array_vector(local_grad_phi, fe, vals->grad_phi, e, 3);
 
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
+			BBFE_std_mapping_vector3d(grad_phi_ip[p], nl, local_grad_phi, basis->N[p]);
+
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
 		}
 
 		for(int i=0; i<nl; i++) {
@@ -487,13 +503,21 @@ void set_element_vec(
 				double tau = BBFE_elemmat_fluid_sups_coef(
 						density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
+				// calculate surface tension
+				double surf_tension_vec[3];
+				BBFE_elemmat_vec_surface_tension(
+					fe->geo[e][p].grad_N[i], density_ip[p], levelset_ip[p], grad_phi_ip[p], vals->surf_tension_coef, surf_tension_vec, vals->size_interface);
+
 				double vec[4];
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity);
+						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_vec);
 
 				for(int d=0; d<4; d++) {
 					val_ip[d][p] = vec[d];
+				}
+				for(int d=0; d<3; d++) {
+					surf_tension_ip[d][p] = surf_tension_vec[d];
 				}
 			}
 
@@ -503,10 +527,14 @@ void set_element_vec(
 
 				monolis->mat.R.B[ 4*fe->conn[e][i] + d ] += integ_val[d];
 			}
+			for(int d=0; d<3; d++) {
+				vals->surf_tension[fe->conn[e][i]][d] += BBFE_std_integ_calc(np, surf_tension_ip[d], basis->integ_weight, Jacobian_ip);
+			}
 		}
 	}
 
 	BB_std_free_2d_double(val_ip, 4, np);
+	BB_std_free_2d_double(surf_tension_ip, 3, np);
 	BB_std_free_1d_double(Jacobian_ip, np);
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
@@ -516,6 +544,11 @@ void set_element_vec(
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(density_ip, np);
 	BB_std_free_1d_double(viscosity_ip, np);
+
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(levelset_ip, np);
+	BB_std_free_2d_double(local_grad_phi, nl, 3);
+	BB_std_free_2d_double(grad_phi_ip, np, 3);
 }
 
 void set_element_mat_levelset(
@@ -571,7 +604,7 @@ void set_element_mat_levelset(
 
 					double tau = elemmat_supg_coef_ml(v_ip[p], h_e, vals->dt);
 
-					val_ip[p] = elemmat_mat_levelset(
+					val_ip[p] = BBFE_elemmat_mat_levelset(
 							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau);
 				}
 
@@ -663,8 +696,7 @@ void set_element_vec_levelset(
 				double tau_lsic    = elemmat_lsic_coef(h_e, v_ip[p]);
 
 				double vec[3];
-				
-				val_ip[p] = elemmat_vec_levelset(
+				val_ip[p] = BBFE_elemmat_vec_levelset(
 					vec, 
 					basis->N[p][i], fe->geo[e][p].grad_N[i], 
 					v_ip[p], grad_v_ip[p],
