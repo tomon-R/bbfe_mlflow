@@ -15,10 +15,12 @@ TARGET4 = surf_nbc
 OBJS4 = surf_nbc.o surf_core.o
 TARGET5 = surf_bc_merge
 OBJS5 = surf_bc_merge.o surf_core.o
+TARGET6 = surf_dbc_sups
+OBJS6 = surf_dbc_sups.o surf_core_sups.o
 
 .SUFFIXES: .c .cpp .o
 
-all: $(TARGET1) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5)
+all: $(TARGET1) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5) $(TARGET6)
 
 $(TARGET1): $(OBJS1)
 	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $^ $(LIBS) 
@@ -35,8 +37,11 @@ $(TARGET4): $(OBJS4)
 $(TARGET5): $(OBJS5)
 	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $^ $(LIBS) 
 
+$(TARGET6): $(OBJS6)
+	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $^ $(LIBS) 
+
 clean:
-		-rm -f $(OBJS1) $(TARGET1) $(OBJS2) $(TARGET2) $(OBJS3) $(TARGET3) $(OBJS4) $(TARGET4) $(OBJS5) $(TARGET5)
+		-rm -f $(OBJS1) $(TARGET1) $(OBJS2) $(TARGET2) $(OBJS3) $(TARGET3) $(OBJS4) $(TARGET4) $(OBJS5) $(TARGET5) $(OBJS6) $(TARGET6)
 
 .cpp.o:
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ -c $^ $(LIBS)
