@@ -6,9 +6,10 @@
 \subsection{解析条件}
 
 Table \ref{table:3d-bubble-material-property}に二つの流体の物性値、Table \ref{table:3d-bubble-parameter}に解析パラメータを示す。
-モートン数$Mo = \frac{(\rho_L-\rho_G)g \mu_L^4 }{\rho_L^2 \sigma^3}$
-エトベス数$Eo = \frac{(\rho_L-\rho_G) g d^2}{\sigma}$
+Case1は表面張力の影響が大きいケースであり、Case2は粘性の影響が大きいケースである。
+ReとEoの値によって気泡の形が変わる分布を実験で分類している論文があり、Case1は球に近い形状を保った楕円形状であり、Case2では変形が大きくなる。
 
+エトベス数$Eo = \frac{(\rho_L-\rho_G) g d^2}{\sigma}$
 
 この式もある$Eo = \frac{4\rho_1 g (r_0)^2}{\sigma}$
 ここで$d$は代表長さで気泡直径。
@@ -19,10 +20,10 @@ Table \ref{table:3d-bubble-material-property}に二つの流体の物性値、Ta
 	\caption{解析パラメータ}
 	\begin{tabular}{cccccccccc}
 		\hline
-		Test case & $\rho_1$ & $\rho_2$ & $\mu_1$ & $\mu_2$ & $\mathrm{g}$ & $\sigma$ & $Eo$ & $Mo$ \\
+		Test case & $\rho_1$ & $\rho_2$ & $\mu_1$ & $\mu_2$ & $\mathrm{g}$ & $\sigma$ & $Eo$ & $Re$ \\
 		\hline 
-		Case$1$ & $1000$ & $100$ & $10$ & $1$   & $0.98$ & $24.5$ & $9.0$ & $0.36$\\
-		Case$2$ & $1000$ & $1$   & $10$ & $0.1$ & $0.98$ & $1.96$ & $125$ & $5.0$\\ 
+		Case$1$ & $1000$ & $100$ & $10$ & $1$   & $0.98$ & $24.5$ & $10$ & $35$\\
+		Case$2$ & $1000$ & $1$   & $10$ & $0.1$ & $0.98$ & $1.96$ & $125$ & $35$\\ 
 		\hline         
 	\end{tabular}
 	\label{table:3d-bubble-material-property}
@@ -30,7 +31,6 @@ Table \ref{table:3d-bubble-material-property}に二つの流体の物性値、Ta
 \renewcommand{\arraystretch}{1.0}
 
 Case1は表面張力が強いため、数値安定性のために$\tau$を小さくする必要がある。\cite{Yamaguchi2018}
-
 
 \renewcommand{\arraystretch}{1}
 \begin{table}[H]
