@@ -29,8 +29,8 @@ void write_levelset_file(
 	/* dambreak 
 	for(int i=0; i<(fe->total_num_nodes); i++) {
 		//printf("%d\n", i);
-		if( ((fabs(fe->x[i][0]-0.45) < MIN_NUM) && (fe->x[i][2] <= 0.9)) ||
-		    ((fabs(fe->x[i][2]-0.90) < MIN_NUM) && (fe->x[i][0] <=0.45)) ){
+		if( ((fabs(fe->x[i][0]-0.146) < MIN_NUM) && (fe->x[i][2] <= 0.292)) ||
+		    ((fabs(fe->x[i][2]-0.292) < MIN_NUM) && (fe->x[i][0] <=0.146)) ){
 			fprintf(fp, "%.15e\n", 0.0);
 		}else if(fe->x[i][0] >= set->x_min[0] && fe->x[i][0] <= set->x_max[0] &&
 		   fe->x[i][1] >= set->x_min[1] && fe->x[i][1] <= set->x_max[1] &&
@@ -54,16 +54,16 @@ void write_levelset_file(
 	}
 	//*/
 
-	/* 2d-bubble
+	//* 2d-bubble
 	for(int i=0; i<(fe->total_num_nodes); i++) {
 		double dx = fe->x[i][0] - 0.5;
-		double dy = fe->x[i][1] - 0.5;
+		double dy = fe->x[i][2] - 0.5;
 		double dd = sqrt(dx*dx+dy*dy);
 
 		fprintf(fp, "%.15e\n", dd-0.25);
 	}
 	//*/
-	//* 3d-bubble
+	/* 3d-bubble
 	for(int i=0; i<(fe->total_num_nodes); i++) {
 		double dx = fe->x[i][0] - 0.5;
 		double dy = fe->x[i][1] - 0.5;
@@ -83,8 +83,8 @@ void calc_distance(BBFE_DATA* fe, double* dist){
 
 	/* dambreak 
 	for(int i=0; i<(fe->total_num_nodes); i++) {
-		if( ((fabs(fe->x[i][0]-0.45) < MIN_NUM) && (fe->x[i][2] <= 0.9)) ||
-		    ((fabs(fe->x[i][2]-0.90) < MIN_NUM) && (fe->x[i][0] <=0.45)) ){
+		if( ((fabs(fe->x[i][0]-0.146) < MIN_NUM) && (fe->x[i][2] <= 0.292)) ||
+		    ((fabs(fe->x[i][2]-0.292) < MIN_NUM) && (fe->x[i][0] <=0.45)) ){
 			dist[i] = 0.0;
 			surface[i] = 1;
 		}else{
@@ -105,6 +105,7 @@ void calc_distance(BBFE_DATA* fe, double* dist){
 	}
 	//*/
 
+	/*
 	for(int i=0; i<(fe->total_num_nodes); i++) {
 		if(surface[i] == 0){
 			for(int j=0; j<(fe->total_num_nodes); j++){
@@ -122,6 +123,7 @@ void calc_distance(BBFE_DATA* fe, double* dist){
 			printf("dist[i] = %f\n", dist[i]); 
 		}
 	}
+	//*/
 
 	free(surface);
 	surface = NULL;
