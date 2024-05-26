@@ -28,6 +28,12 @@ const char*    ID_SURF_TENSION_COEF = "#surf_tension_coef";
 const double DVAL_SURF_TENSION_COEF = 0.0;
 const char*    ID_SIZE_INTERFACE = "#size_interface";
 const double DVAL_SIZE_INTERFACE = 0.1;
+const char*         ID_DT_REINIT = "#dt_reinit";
+const double      DVAL_DT_REINIT = 0.2;
+const char*    ID_EPSILON_REINIT = "#epsilon_reinit";
+const double DVAL_EPSILON_REINIT = 0.5;
+const char*      ID_DELTA_REINIT = "#delta_reinit";
+const double   DVAL_DELTA_REINIT = 1e-1;
 
 const int BUFFER_SIZE = 10000;
 
@@ -37,6 +43,7 @@ static const char* INPUT_FILENAME_D_BC_P  = "D_bc_p.dat";
 static const char* INPUT_FILENAME_LEVELSET= "levelset.dat";
 
 static const char* OUTPUT_FILENAME_VTK    = "result_%d_%06d.vtk";
+static const char* OUTPUT_FILENAME_DAMBREAK = "result_dambreak.csv";
 
 
 typedef struct
@@ -59,11 +66,17 @@ typedef struct
 	double*  viscosity;
 
 	double*  levelset;
+	double*  levelset_tmp;
+	double*  heaviside;
 
 	double surf_tension_coef;
 	double** surf_tension;
 	double** grad_phi;
 	double size_interface;
+
+	double dt_reinit;
+	double epsilon_reinit;
+	double delta_reinit;
 
 } VALUES;
 
@@ -87,6 +100,8 @@ typedef struct
 
 	MONOLIS      monolis;
 	MONOLIS      mono_levelset;
+	MONOLIS      mono_reinit;
+	MONOLIS      mono_L2;
 
 	MONOLIS_COM  mono_com;
 
@@ -102,6 +117,8 @@ void memory_allocation_nodal_values(
 	vals->density   = BB_std_calloc_1d_double(vals->density, total_num_nodes);
 	vals->viscosity = BB_std_calloc_1d_double(vals->viscosity, total_num_nodes);
 	vals->levelset  = BB_std_calloc_1d_double(vals->levelset, total_num_nodes);
+	vals->levelset_tmp  = BB_std_calloc_1d_double(vals->levelset_tmp, total_num_nodes);
+	vals->heaviside  = BB_std_calloc_1d_double(vals->heaviside, total_num_nodes);
 	vals->surf_tension  = BB_std_calloc_2d_double(vals->surf_tension, total_num_nodes, 3);
 	vals->grad_phi  = BB_std_calloc_2d_double(vals->grad_phi, total_num_nodes, 3);
 }
@@ -131,6 +148,10 @@ void assign_default_values(
 	vals->surf_tension_coef = DVAL_SURF_TENSION_COEF;
 
 	vals->size_interface = DVAL_SIZE_INTERFACE;
+
+	vals->dt_reinit = DVAL_DT_REINIT;
+	vals->epsilon_reinit = DVAL_EPSILON_REINIT;
+	vals->delta_reinit = DVAL_DELTA_REINIT;
 }
 
 
@@ -154,6 +175,11 @@ void print_all_values(
 	printf("%s %s: %e %e %e\n", CODENAME, ID_GRAVITY, vals->gravity[0], vals->gravity[1], vals->gravity[2]);
 	printf("%s %s: %e\n", CODENAME, ID_SURF_TENSION_COEF, vals->surf_tension_coef);
 	printf("%s %s: %e\n", CODENAME, ID_SIZE_INTERFACE, vals->size_interface);
+
+	printf("%s %s: %e\n", CODENAME, ID_DT_REINIT, vals->dt_reinit);
+	printf("%s %s: %e\n", CODENAME, ID_EPSILON_REINIT, vals->epsilon_reinit);
+	printf("%s %s: %e\n", CODENAME, ID_DELTA_REINIT, vals->delta_reinit);
+
 	printf("%s -------------------------------------------\n\n", CODENAME);
 }
 
@@ -205,6 +231,12 @@ void read_calc_conditions(
 				&(vals->surf_tension_coef), filename, ID_SURF_TENSION_COEF, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
 				&(vals->size_interface), filename, ID_SIZE_INTERFACE, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_double_p(
+				&(vals->dt_reinit), filename, ID_DT_REINIT, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_double_p(
+				&(vals->epsilon_reinit), filename, ID_EPSILON_REINIT, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_double_p(
+				&(vals->delta_reinit), filename, ID_DELTA_REINIT, BUFFER_SIZE, CODENAME);
 		fclose(fp);
 	}
 
@@ -272,9 +304,11 @@ void output_result_file_vtk(
 	BB_vtk_write_point_vals_vector(fp, vals->v, fe->total_num_nodes, "Velocity");
 	BB_vtk_write_point_vals_scalar(fp, vals->p, fe->total_num_nodes, "Pressure");
 	BB_vtk_write_point_vals_scalar(fp, vals->levelset, fe->total_num_nodes, "Levelset");
+	BB_vtk_write_point_vals_scalar(fp, vals->heaviside, fe->total_num_nodes, "Heaviside");
 	BB_vtk_write_point_vals_scalar(fp, vals->density, fe->total_num_nodes, "Density");
 	BB_vtk_write_point_vals_scalar(fp, vals->viscosity, fe->total_num_nodes, "Viscosity");
 	BB_vtk_write_point_vals_vector(fp, vals->surf_tension, fe->total_num_nodes, "SurfaceTension");
+	BB_vtk_write_point_vals_vector(fp, vals->grad_phi, fe->total_num_nodes, "GradientLevelset");
 	fclose(fp);
 
 }
@@ -443,10 +477,8 @@ void set_element_vec(
 	int np = basis->num_integ_points;
 
 	double** val_ip;
-	double** surf_tension_ip;
 	double*  Jacobian_ip;
 	val_ip      = BB_std_calloc_2d_double(val_ip, 4, np);
-	surf_tension_ip = BB_std_calloc_2d_double(val_ip, 3, np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
 	double** local_v;
@@ -473,6 +505,10 @@ void set_element_vec(
 	double** grad_phi_ip;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
+	double** surf_tension_ip; double** surf_tension_ip2;
+	surf_tension_ip = BB_std_calloc_2d_double(val_ip, np, 3);
+	surf_tension_ip2 = BB_std_calloc_2d_double(val_ip, 3, np);
+
 	for(int e=0; e<(fe->total_num_elems); e++) {
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
 
@@ -489,7 +525,7 @@ void set_element_vec(
 
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
-			BBFE_std_mapping_vector3d(grad_phi_ip[p], nl, local_grad_phi, basis->N[p]);
+			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
 
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
@@ -503,21 +539,20 @@ void set_element_vec(
 				double tau = BBFE_elemmat_fluid_sups_coef(
 						density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
-				// calculate surface tension
-				double surf_tension_vec[3];
 				BBFE_elemmat_vec_surface_tension(
-					fe->geo[e][p].grad_N[i], density_ip[p], levelset_ip[p], grad_phi_ip[p], vals->surf_tension_coef, surf_tension_vec, vals->size_interface);
+						basis->N[p][i], fe->geo[e][p].grad_N[i], levelset_ip[p], grad_phi_ip[p], 
+						vals->surf_tension_coef, surf_tension_ip[p], vals->epsilon_reinit);
 
 				double vec[4];
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_vec);
+						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p]);
 
 				for(int d=0; d<4; d++) {
 					val_ip[d][p] = vec[d];
 				}
-				for(int d=0; d<3; d++) {
-					surf_tension_ip[d][p] = surf_tension_vec[d];
+				for(int d=0; d<3; d++){
+					surf_tension_ip2[d][p] = surf_tension_ip[p][d];
 				}
 			}
 
@@ -527,14 +562,14 @@ void set_element_vec(
 
 				monolis->mat.R.B[ 4*fe->conn[e][i] + d ] += integ_val[d];
 			}
+
 			for(int d=0; d<3; d++) {
-				vals->surf_tension[fe->conn[e][i]][d] += BBFE_std_integ_calc(np, surf_tension_ip[d], basis->integ_weight, Jacobian_ip);
+				vals->surf_tension[fe->conn[e][i]][d] += BBFE_std_integ_calc(np, surf_tension_ip2[d], basis->integ_weight, Jacobian_ip);
 			}
 		}
 	}
 
 	BB_std_free_2d_double(val_ip, 4, np);
-	BB_std_free_2d_double(surf_tension_ip, 3, np);
 	BB_std_free_1d_double(Jacobian_ip, np);
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
@@ -549,8 +584,14 @@ void set_element_vec(
 	BB_std_free_1d_double(levelset_ip, np);
 	BB_std_free_2d_double(local_grad_phi, nl, 3);
 	BB_std_free_2d_double(grad_phi_ip, np, 3);
+
+	BB_std_free_2d_double(surf_tension_ip, np, 3);
+	BB_std_free_2d_double(surf_tension_ip2, 3, np);
 }
 
+/**********************************************************
+ * Matrix and Vector for Levelset 
+ **********************************************************/
 void set_element_mat_levelset(
 		MONOLIS*     monolis,
 		BBFE_DATA*   fe,
@@ -725,7 +766,11 @@ void set_element_vec_levelset(
 	BB_std_free_2d_double(grad_phi_ip, np, 3);
 }
 
-void set_grad_phi_node(
+/**********************************************************
+ * L2 projection of gradient of levelset
+ **********************************************************/
+void set_element_vec_L2_projection(
+		MONOLIS*    monolis,
 		BBFE_DATA*	fe,
 		BBFE_BASIS* basis,
 		VALUES*		vals)
@@ -740,15 +785,10 @@ void set_grad_phi_node(
 
 	double* local_levelset;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double* levelset_ip;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
 	double** grad_phi_ip;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
-
-	// initialize grad_phi
-	for(int i=0;i<fe->total_num_nodes;i++){
-		for(int d=0;d<3;d++){
-			vals->grad_phi[i][d] = 0;
-		}
-	}
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
@@ -760,21 +800,29 @@ void set_grad_phi_node(
 		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
 
 		for(int p=0; p<np; p++) {
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
 			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
+
 		}
 
 		for(int i=0; i<nl; i++) {
-			for(int d=0;d<3;d++){
-				for(int p=0; p<np; p++) {
-					val_ip[d][p] = grad_phi_ip[p][d];
+			for(int p=0; p<np; p++) {
+				double vec[3];
+				
+				BBFE_elemmat_vec_grad_phi_L2_projection(
+						vec, basis->N[p][i], grad_phi_ip[p]);
+
+				for(int d=0; d<3; d++) {
+					val_ip[d][p] = vec[d];
 				}
-				double integ_val = BBFE_std_integ_calc(
+			}
+			double integ_val[3];
+			for(int d=0; d<3; d++) {
+				integ_val[d] = BBFE_std_integ_calc(
 						np, val_ip[d], basis->integ_weight, Jacobian_ip);
 
-				vals->grad_phi[fe->conn[e][i]][d] += integ_val / vol;
-
+				monolis->mat.R.B[ 3*(fe->conn[e][i]) + d ] += integ_val[d];
 			}
-
 		}
 	}
 	
@@ -782,7 +830,488 @@ void set_grad_phi_node(
 	BB_std_free_1d_double(Jacobian_ip, np);
 
 	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(levelset_ip, np);
 	BB_std_free_2d_double(grad_phi_ip, np, 3);
+}
+
+/**********************************************************
+ * Reinitialization of Levelset
+ **********************************************************/
+void set_element_vec_levelset_reinitialize(
+		MONOLIS*     monolis,
+		BBFE_DATA*   fe,
+		BBFE_BASIS*  basis,
+		VALUES*      vals)
+{
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
+
+	double* val_ip;  double* Jacobian_ip;
+	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	double* local_levelset;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double* levelset_ip;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
+
+	double* local_levelset_tmp;
+	local_levelset_tmp = BB_std_calloc_1d_double(local_levelset_tmp, nl);
+	double* levelset_ip_tmp;
+	levelset_ip_tmp = BB_std_calloc_1d_double(levelset_ip_tmp, np);
+
+	double** local_grad_phi;
+	local_grad_phi = BB_std_calloc_2d_double(local_grad_phi, nl, 3);
+	double** grad_phi_ip;
+	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+		BBFE_elemmat_set_local_array_scalar(local_levelset_tmp, fe, vals->levelset_tmp, e);
+		BBFE_elemmat_set_local_array_vector(local_grad_phi, fe, vals->grad_phi, e, 3);
+
+		for(int p=0; p<np; p++) {
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
+			levelset_ip_tmp[p]  = BBFE_std_mapping_scalar(nl, local_levelset_tmp, basis->N[p]);
+			//BBFE_std_mapping_vector3d(grad_phi_ip[p], nl, local_grad_phi, basis->N[p]);
+			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], np, local_levelset, fe->geo[e][p].grad_N);
+		}
+
+		for(int i=0; i<nl; i++) {
+			for(int p=0; p<np; p++) {
+				val_ip[p] = BBFE_elemmat_vec_levelset_reinitialize(
+					basis->N[p][i], levelset_ip[p], levelset_ip_tmp[p], grad_phi_ip[p], vals->dt_reinit, vals->epsilon_reinit);
+			}
+			double integ_val = BBFE_std_integ_calc(
+					np, val_ip, basis->integ_weight, Jacobian_ip);
+
+			monolis->mat.R.B[ fe->conn[e][i] ] += integ_val;
+		}
+	}
+
+	BB_std_free_1d_double(val_ip,      np);
+	BB_std_free_1d_double(Jacobian_ip, np);
+
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(local_levelset_tmp, nl);
+	BB_std_free_1d_double(levelset_ip, np);
+	BB_std_free_1d_double(levelset_ip_tmp, np);
+
+	BB_std_free_2d_double(local_grad_phi, nl, 3);
+	BB_std_free_2d_double(grad_phi_ip, np, 3);
+}
+
+void reinit_levelset(
+		FE_SYSTEM*  sys)
+{
+	double t = 0.0;
+	int step = 0;
+
+	for(int i=0; i<sys->fe.total_num_nodes; i++){
+		sys->vals.levelset_tmp[i] = sys->vals.levelset[i];
+	}
+
+	while (step<5) {
+		t += sys->vals.dt_reinit;
+		step += 1;
+		monolis_clear_mat_value_R(&(sys->mono_reinit));
+		monolis_clear_mat_value_rhs_R(&(sys->mono_reinit));
+
+		BBFE_elemmat_set_global_mat_cmass_const(
+					&(sys->mono_reinit),
+					&(sys->fe),
+					&(sys->basis), 
+					1.0, 
+					1);
+		set_element_vec_levelset_reinitialize(
+					&(sys->mono_reinit),
+					&(sys->fe),
+					&(sys->basis),
+					&(sys->vals));
+		BBFE_sys_monowrap_solve(
+					&(sys->mono_reinit),
+					&(sys->mono_com),
+					sys->mono_reinit.mat.R.X,
+					MONOLIS_ITER_BICGSTAB,
+					MONOLIS_PREC_DIAG,
+					sys->vals.mat_max_iter,
+					sys->vals.mat_epsilon);
+
+		double error = 0.0;
+		for(int i=0; i<(sys->fe.total_num_nodes); i++) {
+			// Residual
+			error += (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]) * (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]);
+			// Update levelset value
+			sys->vals.levelset[i] = sys->mono_reinit.mat.R.X[i];
+		}
+		printf("Reinitialization Step: %d\n", step);
+		printf("Error: %f, Delta: %f\n", sqrt(error)/sys->vals.dt_reinit, sys->vals.delta_reinit);
+		if(sqrt(error)/sys->vals.dt_reinit < sys->vals.delta_reinit){
+			break;
+		}
+	}
+}
+
+/**********************************************************
+ * Reinitialization of Conservative Levelset
+ **********************************************************/
+void set_element_mat_CLSM_reinitialize(
+		MONOLIS*     monolis,
+		BBFE_DATA*   fe,
+		BBFE_BASIS*  basis,
+		VALUES*      vals)
+{
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
+
+	double* val_ip;  double* Jacobian_ip;
+	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	double* local_levelset;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double* levelset_ip;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
+
+	double** local_grad_phi;
+	local_grad_phi = BB_std_calloc_2d_double(local_grad_phi, nl, 3);
+	double** grad_phi_ip;
+	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		double vol = BBFE_std_integ_calc_volume(np, basis->integ_weight, Jacobian_ip);
+		double h_e = cbrt(vol);
+
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+		BBFE_elemmat_set_local_array_vector(local_grad_phi, fe, vals->grad_phi, e, 3);
+
+		for(int p=0; p<np; p++) {
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
+			BBFE_std_mapping_vector3d(grad_phi_ip[p], nl, local_grad_phi, basis->N[p]);
+		}
+
+		for(int i=0; i<nl; i++) {
+			for(int j=0; j<nl; j++) {
+
+				for(int p=0; p<np; p++) {
+					val_ip[p] = 0.0;
+					val_ip[p] = BBFE_elemmat_mat_CLSM_reinitialize(
+							basis->N[p][i], basis->N[p][j], 
+							fe->geo[e][p].grad_N[i], fe->geo[e][p].grad_N[j],
+							levelset_ip[p], grad_phi_ip[p], vals->dt_reinit, vals->epsilon_reinit);
+				}
+
+				double integ_val = BBFE_std_integ_calc(
+						np, val_ip, basis->integ_weight, Jacobian_ip);
+
+				monolis_add_scalar_to_sparse_matrix_R(
+						monolis, fe->conn[e][i], fe->conn[e][j], 0, 0, integ_val);
+			}
+		}
+	}
+
+	BB_std_free_1d_double(val_ip,      np);
+	BB_std_free_1d_double(Jacobian_ip, np);
+
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(levelset_ip, np);
+
+	BB_std_free_2d_double(local_grad_phi, nl, 3);
+	BB_std_free_2d_double(grad_phi_ip, np, 3);
+}
+
+void set_element_vec_CLSM_reinitialize(
+		MONOLIS*     monolis,
+		BBFE_DATA*   fe,
+		BBFE_BASIS*  basis,
+		VALUES*      vals)
+{
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
+
+	double* val_ip;  double* Jacobian_ip;
+	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	double* local_levelset;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double* levelset_ip;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
+
+	double** local_normal_vec;
+	local_normal_vec = BB_std_calloc_2d_double(local_normal_vec, nl, 3);
+	double** normal_vec_ip;
+	normal_vec_ip = BB_std_calloc_2d_double(normal_vec_ip, np, 3);
+
+	double** grad_phi_ip;
+	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		double vol = BBFE_std_integ_calc_volume(np, basis->integ_weight, Jacobian_ip);
+		double h_e = cbrt(vol);
+
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+		BBFE_elemmat_set_local_array_vector(local_normal_vec, fe, vals->grad_phi, e, 3);
+
+		for(int p=0; p<np; p++) {
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
+			BBFE_std_mapping_vector3d(normal_vec_ip[p], nl, local_normal_vec, basis->N[p]);
+			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
+		}
+
+		for(int i=0; i<nl; i++) {
+			for(int p=0; p<np; p++) {
+				double vec[3];
+				val_ip[p] = BBFE_elemmat_vec_CLSM_reinitialize(
+					basis->N[p][i],
+					fe->geo[e][p].grad_N[i],
+					levelset_ip[p], normal_vec_ip[p], grad_phi_ip[p], vals->dt_reinit, vals->epsilon_reinit);
+			}
+			double integ_val = BBFE_std_integ_calc(
+					np, val_ip, basis->integ_weight, Jacobian_ip);
+
+			monolis->mat.R.B[ fe->conn[e][i] ] += integ_val;
+		}
+	}
+
+	BB_std_free_1d_double(val_ip,      np);
+	BB_std_free_1d_double(Jacobian_ip, np);
+
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(levelset_ip, np);
+
+	BB_std_free_2d_double(local_normal_vec, nl, 3);
+	BB_std_free_2d_double(normal_vec_ip, np, 3);
+
+	//BB_std_free_2d_double(local_grad_phi, nl, 3);
+	BB_std_free_2d_double(grad_phi_ip, np, 3);
+}
+
+
+void reinit_CLSM(
+		FE_SYSTEM*  sys)
+{
+	double t = 0.0;
+	int step = 0;
+	double error = 1e10;
+	while (sqrt(error)/sys->vals.dt_reinit > sys->vals.delta_reinit) {
+		t += sys->vals.dt_reinit;
+		step += 1;
+		monolis_clear_mat_value_R(&(sys->mono_reinit));
+		monolis_clear_mat_value_rhs_R(&(sys->mono_reinit));
+		
+		set_element_mat_CLSM_reinitialize(
+					&(sys->mono_reinit),
+					&(sys->fe),
+					&(sys->basis),
+					&(sys->vals));
+		set_element_vec_CLSM_reinitialize(
+					&(sys->mono_reinit),
+					&(sys->fe),
+					&(sys->basis),
+					&(sys->vals));
+		BBFE_sys_monowrap_solve(
+					&(sys->mono_reinit),
+					&(sys->mono_com),
+					sys->mono_reinit.mat.R.X,
+					MONOLIS_ITER_BICGSTAB,
+					MONOLIS_PREC_DIAG,
+					sys->vals.mat_max_iter,
+					sys->vals.mat_epsilon);
+
+		error = 0.0;
+		for(int i=0; i<(sys->fe.total_num_nodes); i++) {
+			// Residual
+			error += (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]) * (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]);
+			// Update levelset value
+			sys->vals.levelset[i] = sys->mono_reinit.mat.R.X[i];
+		}
+		printf("Reinitialization Step: %d\n", step);
+		printf("Error: %f, Delta: %f\n", sqrt(error)/sys->vals.dt_reinit, sys->vals.delta_reinit);
+		if(sqrt(error)/sys->vals.dt_reinit < sys->vals.delta_reinit){
+			break;
+		}
+	}
+}
+
+/**********************************************************
+ * Element matrix for L2 projection
+ **********************************************************/
+void BBFE_elemmat_mat_L2projection(
+		MONOLIS*    monolis,
+		BBFE_DATA*  fe,
+		BBFE_BASIS* basis,
+		double      coef,
+		int         block_size)
+{
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
+
+	double* val_ip;  double* Jacobian_ip;
+	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		for(int i=0; i<nl; i++) {
+			for(int j=0; j<nl; j++) {
+
+				for(int p=0; p<np; p++) {
+					val_ip[p] = 0.0;
+
+					val_ip[p] += coef * basis->N[p][i] * basis->N[p][j];
+				}
+
+				double integ_val = BBFE_std_integ_calc(
+						np, val_ip, basis->integ_weight, Jacobian_ip);
+
+				for(int b=0; b<block_size; b++) {
+					if(fe->conn[e][i] == fe->conn[e][j]){ // only diagonal because I matrix is multiplied for L2 projection of liner element
+						monolis_add_scalar_to_sparse_matrix_R(
+								monolis,
+								fe->conn[e][i], fe->conn[e][j], b, b,
+								integ_val);
+					}
+				}
+			}
+		}
+	}
+
+	BB_std_free_1d_double(val_ip,      basis->num_integ_points);
+	BB_std_free_1d_double(Jacobian_ip, basis->num_integ_points);
+}
+
+/**********************************************************
+ * Output Dambreak Data
+ **********************************************************/
+typedef struct {
+	double key;
+	double value;
+}Pair;
+
+int compare(const void *a, const void *b) {
+    double diff = ((Pair*)a)->key - ((Pair*)b)->key;
+    if (diff < 0) return -1;
+    if (diff > 0) return 1;
+    return 0;
+}
+
+void output_result_dambreak_data(
+		FE_SYSTEM* sys,
+		const char* directory,
+		double time)
+{
+	char filename[BUFFER_SIZE];
+	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_DAMBREAK);
+
+	FILE* fp;
+	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
+
+	int cnt_bottom = 0;
+	int cnt_height = 0;
+	const double eps  = 1.0e-10;
+
+	for(int i=0; i<sys->fe.total_num_nodes; i++){
+		if(abs(sys->fe.x[i][2] - 0.0) < eps && abs(sys->fe.x[i][1] - 0.0) < eps){
+			// (y,z)=(0,0)
+			cnt_bottom++;
+		}
+		if(abs(sys->fe.x[i][0] - 0.0) < eps && abs(sys->fe.x[i][1] - 0.0) < eps){
+			// (x,y)=(0,0)
+			cnt_height++;
+		}
+	}
+
+	double* x = BB_std_calloc_1d_double(x, cnt_bottom);
+	double* phi_x = BB_std_calloc_1d_double(phi_x, cnt_bottom);
+	double* z = BB_std_calloc_1d_double(z, cnt_height);
+	double* phi_z = BB_std_calloc_1d_double(phi_z, cnt_height);
+	Pair *pairs_x = (Pair*)malloc(cnt_bottom * sizeof(Pair));
+	Pair *pairs_z = (Pair*)malloc(cnt_height * sizeof(Pair));
+    if (pairs_x == NULL || pairs_z == NULL) {
+        fprintf(stderr, "メモリ割り当てエラー\n");
+        exit(1);
+    }
+	int id_x = 0;
+	int id_z = 0;
+
+	for(int i=0; i<sys->fe.total_num_nodes; i++){
+		if(abs(sys->fe.x[i][2] - 0.0) < eps && abs(sys->fe.x[i][1] - 0.0) < eps){
+			// (y,z)=(0,0)
+			x[id_x] = sys->fe.x[i][0];
+			phi_x[id_x] = sys->vals.levelset[i];
+			pairs_x[id_x].key = x[id_x];
+			pairs_x[id_x].value = phi_x[id_x];
+			id_x++;
+		}
+		if(abs(sys->fe.x[i][0] - 0.0) < eps && abs(sys->fe.x[i][1] - 0.0) < eps){
+			// (x,y)=(0,0)
+			z[id_z] = sys->fe.x[i][2];
+			phi_z[id_z] = sys->vals.levelset[i];
+			pairs_z[id_z].key = z[id_z];
+			pairs_z[id_z].value = phi_z[id_z];
+			id_z++;
+		}
+	}
+
+	qsort(pairs_x, cnt_bottom, sizeof(Pair), compare);
+	qsort(pairs_z, cnt_height, sizeof(Pair), compare);
+
+	if(abs(time-0.0)<eps){
+		fprintf(fp, "%s, %s, %s, \n", "Time", "x", "z");
+	}
+	fprintf(fp, "%lf, ", time);
+	for(int i=0; i<cnt_bottom-1; i++){
+		//fprintf(fp, "%lf, %lf\n", pairs_x[i].key, pairs_x[i].value);
+		if(pairs_x[i].value>0 && pairs_x[i+1].value<0){
+			double x1 = pairs_x[i].key;
+			double x2 = pairs_x[i+1].key;
+			double p1 = pairs_x[i].value;
+			double p2 = pairs_x[i+1].value;
+
+			double x_zero = (p1*x2 - p2*x1)/(p1 - p2);
+			
+			//fprintf(fp, "%lf, %lf\n", x1, p1);
+			fprintf(fp, "%lf, ", x_zero);
+			//fprintf(fp, "%lf, %lf\n", x2, p2);
+		}else if(abs(pairs_x[i].value)<eps){
+			fprintf(fp, "%lf, ", pairs_x[i].key);
+		}
+	}
+
+	for(int i=0; i<cnt_height; i++){
+		if(pairs_z[i].value>0 && pairs_z[i+1].value<0){
+			double z1 = pairs_z[i].key;
+			double z2 = pairs_z[i+1].key;
+			double p1 = pairs_z[i].value;
+			double p2 = pairs_z[i+1].value;
+
+			double z_zero = (p1*z2 - p2*z1)/(p1 - p2);
+			
+			//fprintf(fp, "%lf, %lf\n", z1, p1);
+			fprintf(fp, "%lf\n", z_zero);
+			//fprintf(fp, "%lf, %lf\n", z2, p2);
+		}else if(abs(pairs_z[i].value)<eps){
+			fprintf(fp, "%lf\n, ", pairs_z[i].key);
+		}
+	}
+
+	BB_std_free_1d_double(x, cnt_bottom);
+	BB_std_free_1d_double(phi_x, cnt_bottom);
+	BB_std_free_1d_double(z, cnt_height);
+	BB_std_free_1d_double(phi_z, cnt_height);
+	free(pairs_x);
+	free(pairs_z);
+
+	fclose(fp);
+
 }
 
 int main(
@@ -822,16 +1351,23 @@ int main(
 	
 	BBFE_sys_monowrap_init_monomat(&(sys.monolis) , &(sys.mono_com), &(sys.fe), 4, sys.cond.directory);
 	BBFE_sys_monowrap_init_monomat(&(sys.mono_levelset)  , &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_reinit)  , &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_L2)  , &(sys.mono_com), &(sys.fe), 3, sys.cond.directory);
+
+	BBFE_elemmat_mat_L2projection(&(sys.mono_L2), &(sys.fe), &(sys.basis), 1.0, 3);
 
 	filename = monolis_get_global_input_file_name(MONOLIS_DEFAULT_TOP_DIR, MONOLIS_DEFAULT_PART_DIR, INPUT_FILENAME_LEVELSET);
 	read_levelset_file(&(sys.fe), &(sys.vals), filename, sys.cond.directory);
-	BBFE_fluid_convert_levelset2heaviside(sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+	//BBFE_fluid_convert_levelset2CLSM(sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+	BBFE_fluid_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
 
 	/****************** solver ********************/
 	double t = 0.0;
 	int step = 0;
 	int file_num = 0;
 	output_files(&sys, file_num, t);
+	output_result_dambreak_data(&sys, sys.cond.directory, t);
+
 	while (t < sys.vals.finish_time) {
 		t += sys.vals.dt;
 		step += 1;
@@ -843,11 +1379,7 @@ int main(
 		monolis_clear_mat_value_R(&(sys.mono_levelset));
 		monolis_clear_mat_value_rhs_R(&(sys.mono_levelset));
 
-		// update gradient of phi at nodes
-		set_grad_phi_node(
-				&(sys.fe),
-				&(sys.basis),
-				&(sys.vals));
+		monolis_clear_mat_value_rhs_R(&(sys.mono_L2));
 
 		// clear surface tension vector
 		for(int m=0;m<sys.fe.total_num_nodes;m++){
@@ -857,7 +1389,24 @@ int main(
 		}
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
+		BBFE_fluid_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+		//*
 		BBFE_fluid_renew_vals_by_levelset(
+				sys.vals.heaviside, 
+				sys.vals.density,
+				sys.vals.density_l,
+				sys.vals.density_g,
+				sys.fe.total_num_nodes);
+
+		BBFE_fluid_renew_vals_by_levelset(
+				sys.vals.heaviside, 
+				sys.vals.viscosity,
+				sys.vals.viscosity_l,
+				sys.vals.viscosity_g,
+				sys.fe.total_num_nodes); //*/
+
+		/*
+		BBFE_fluid_renew_vals_by_CLSM(
 				sys.vals.levelset, 
 				sys.vals.density,
 				sys.vals.density_l,
@@ -870,6 +1419,7 @@ int main(
 				sys.vals.viscosity_l,
 				sys.vals.viscosity_g,
 				sys.fe.total_num_nodes);
+		//*/
 		
 		printf("%s --- directly solve velocity and pressure step ---\n", CODENAME);
 		set_element_mat(
@@ -927,6 +1477,29 @@ int main(
 				sys.mono_levelset.mat.R.X,
 				sys.fe.total_num_nodes);
 
+		printf("%s --- L2 projection of Levelset step ---\n", CODENAME);
+		set_element_vec_L2_projection(
+				&(sys.mono_L2),
+				&(sys.fe),
+				&(sys.basis),
+				&(sys.vals));
+		BBFE_sys_monowrap_solve(
+				&(sys.mono_L2),
+				&(sys.mono_com),
+				sys.mono_L2.mat.R.X,
+				MONOLIS_ITER_BICGSTAB,
+				MONOLIS_PREC_SOR,
+				sys.vals.mat_max_iter,
+				sys.vals.mat_epsilon);
+		BBFE_fluid_renew_velocity(
+				sys.vals.grad_phi,
+				sys.mono_L2.mat.R.X,
+				sys.fe.total_num_nodes);
+
+		printf("%s --- Reinitialization step ---\n", CODENAME);
+		reinit_levelset(&(sys));
+		//reinit_CLSM(&(sys));
+
 		/**********************************************/
 
 		if(step%sys.vals.output_interval == 0) {
@@ -934,9 +1507,11 @@ int main(
 			BBFE_fluid_sups_renew_pressure(
 				sys.vals.p,
 				sys.monolis.mat.R.X,
+				sys.vals.density,
 				sys.fe.total_num_nodes);
 
 			output_files(&sys, file_num+1, t);
+			output_result_dambreak_data(&sys, sys.cond.directory, t);
 			file_num += 1;
 		}
 
@@ -946,6 +1521,7 @@ int main(
 	BBFE_sys_memory_free_Dirichlet_bc(&(sys.bc), sys.fe.total_num_nodes, 4);
 	monolis_finalize(&(sys.monolis));
 	monolis_finalize(&(sys.mono_levelset));
+	monolis_finalize(&(sys.mono_reinit));
 
 	double t2 = monolis_get_time();
 	int myrank = monolis_mpi_get_global_my_rank();
