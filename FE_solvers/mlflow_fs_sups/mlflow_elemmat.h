@@ -31,10 +31,42 @@ double BBFE_elemmat_vec_levelset(
 		const double   dt);
 
 void BBFE_elemmat_vec_surface_tension(
+		const double   N_i,
 		const double   grad_N_i[3],
-		const double   density,
 		const double   phi,
 		const double   grad_phi[3],
 		const double   sigma,
 		double*        surf_tension_vec,
 		const double   size_interface);
+
+double BBFE_elemmat_vec_levelset_reinitialize(
+		const double N_i,
+		const double phi,
+		const double phi_zero,
+		const double grad_phi[3],
+		const double dt,
+		const double epsilon);
+
+double BBFE_elemmat_mat_CLSM_reinitialize(
+		const double N_i,
+		const double N_j,
+		const double grad_N_i[3],
+		const double grad_N_j[3],
+		const double phi,
+		const double grad_phi[3],
+		const double dt,
+		const double epsilon);
+
+double BBFE_elemmat_vec_CLSM_reinitialize(
+		const double N_i,
+		const double grad_N_i[3],
+		const double phi,
+		const double normal_vec[3],
+		const double grad_phi[3],
+		const double dt,
+		const double epsilon);
+
+double BBFE_elemmat_vec_grad_phi_L2_projection(
+		double vec[3],
+		const double N_i,
+		const double grad_phi[3]);
