@@ -1,0 +1,97 @@
+\newpage
+\section{3次元のダムブレイク問題}
+二層流のベンチマーク問題として3次元のダムブレイク問題を解析した。
+
+\subsection{解析条件}
+
+Table \ref{table:dambreak-material-property}に二つの流体の物性値を示す。
+Case1は水と空気の物性値である。
+\renewcommand{\arraystretch}{1}
+\begin{table}[H]
+	\centering
+	\caption{物性値}
+	\begin{tabular}{ccccccc}
+		\hline
+		Test case & $\rho_1 (\mathrm{kg/m^3})$ & $\rho_2 (\mathrm{kg/m^3})$ & $\mu_1 (\mathrm{Ns/m^2})$& $\mu_2 (\mathrm{Ns/m^2})$ & $\mathrm{g} (\mathrm{m/s^2})$ \\
+		\hline 
+		Case$1$ & $998$ & $1.205$   & $1.01\times10^{-3}$ & $1.81\times10^{-5}$ & $9.81$ \\
+		\hline         
+	\end{tabular}
+	\label{table:dambreak-material-property}
+\end{table}
+\renewcommand{\arraystretch}{1.0}
+
+代表長さ$a=0.146 \mathrm{m}$として、
+水柱の初期高さ$a(=0.146\mathrm{m})$、初期幅$2a(=0.292\mathrm{m})$、領域の高さ$2.4a(=0.3504\mathrm{m})$、幅$4a(=0.584\mathrm{m})$、奥行き$0.1a(=0.0146\mathrm{m})$とした。
+
+Table \ref{table:dambreak-parameter}に解析における設定パラメータを示す。
+界面幅$D$は、近似ヘビサイド関数よる平滑化の計算式(\ref{ls-heaviside})に含まれるパラメータである。
+Case1と2では$D$の値が異なり、Case2の方がCase1よりも界面が平滑化される。
+\renewcommand{\arraystretch}{1}
+\begin{table}[H]
+	\centering
+	\caption{解析パラメータ}
+	\begin{tabular}{cccccc}
+		\hline
+		Test case & $\Delta t$ & メッシュ幅$dx$ & 界面幅$D$ & 再初期化回数 & 再初期化$\Delta \tau$\\
+		\hline 
+		Case$1$ & $0.0001$ & $0.05$ & $0.05$ & $5$ & $0.01$\\
+		\hline         
+	\end{tabular}
+	\label{table:dambreak-parameter}
+\end{table}
+\renewcommand{\arraystretch}{1.0}
+
+Figure \ref{fig:3d-dambreak-mesh}に解析用のメッシュを示す。メッシュは六面体$1$次要素を使用した。
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=18truecm]{pics/3d-dambreak/mesh.pdf}
+	\caption{ダムブレイクの計算メッシュ}
+	\label{fig:3d-dambreak-mesh}
+\end{figure}
+
+Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数と、境界条件を示す。
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=18truecm]{pics/3d-dambreak/levelset_init.pdf}
+	\caption{ダムブレイクの初期のレベルセット関数と境界条件}
+	\label{fig:3d-dambreak-boundary}
+\end{figure}
+
+\subsection{解析結果}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=18truecm]{pics/3d-dambreak/levelset_velocity.pdf}
+	\caption{ダムブレイク問題の計算結果における速度と圧力分布}
+	\label{fig:3d-dambreak-result}
+\end{figure}
+
+検証比較\cite{Martin1952}
+
+\subsection{並列解析結果}
+本ソルバーは領域分割法によるMPI並列化にも対応しているため、
+3.5項で示した並列化解析実行手順に従い並列数を4として並列解析をした結果を示す。
+Figure \ref{fig:3d-dambreak-parallel-partition}に領域分割したメッシュを示す。
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=18truecm]{pics/3d-dambreak-parallel/partition4.pdf}
+	\caption{並列数4の場合の領域分割の図}
+	\label{fig:3d-dambreak-parallel-partition}
+\end{figure}
+
+Figure \ref{fig:3d-dambreak-parallel-result}に速度分布、圧力分布、レベルセット関数の結果を示す。
+並列化なしの場合と同様の結果が得られており、並列化解析が問題なくできていることが確認できた。
+計算時間についても大幅に短くなっているが、時間計測は今回は行っていないため、今後スケーリング効果の計測を実施する。
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=18truecm]{pics/3d-dambreak-parallel/result-partition4.pdf}
+	\caption{ダムブレイク問題のCase2の並列化解析による計算結果（$y=0.4$における断面）。網目の色の違いで領域分割されている領域を可視化した。}
+	\label{fig:3d-dambreak-parallel-result}
+\end{figure}
+
+ダムブレイクの検証\cite{Okumura2009}, 
+有名な文献\cite{Koshizuka1996}

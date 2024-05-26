@@ -1,0 +1,153 @@
+\newpage
+\section{レベルセット法による自由表面流れの計算}
+自由表面流れとして界面捕捉法の一種であるレベルセット法を用いた自由表面流れ解析手法について述べる。
+
+\subsection{支配方程式}
+レベルセット法による自由表面流れの支配方程式は、
+Navier-Stokes方程式(\ref{fluid-ns})と連続の式(\ref{fluid-continuum})で表される。
+界面捕捉法では解析メッシュは固定メッシュを用いるため、界面を間接的に表現するための関数（界面関数）を導入する。
+界面の支配方程式は以下の移流方程式(\ref{ls-eq})で表される。
+\begin{equation}
+\label{ls-eq}
+	\frac{\partial \phi}{\partial t} + \bm{u} \cdot \nabla \phi = 0 \quad in \quad \Omega
+\end{equation}
+ここで、$\phi$は界面関数、$\bm{u}$は速度ベクトルである。
+
+\subsection{SUPG法による安定化有限要素法}
+式(\ref{ls-eq})に対してSUPG法に基づく安定化有限要素法を適用すると
+以下の式(\ref{ls-supg})が得られる。
+\begin{equation}
+\label{ls-supg}
+		\begin{split}
+		\int_{\Omega} \psi^{h}\left( \frac{\partial \phi}{\partial t} + \bm{u}^{n} \cdot \nabla \phi^{h} \right) \; d\Omega \;+& 
+		\sum^{n_el}_{e=1} \int_{\Omega_{e}} \tau_{\phi} \bm{u}^{h} \cdot \nabla \psi^{h} \left( \frac{\partial \phi^{h}}{\partial t} + \bm{u}^{h} \cdot \nabla \phi^{h} \right) \; d\Omega \\
+		+& \sum^{n_el}_{e=1} \int_{\Omega_{e}} \tau_{LSIC} \nabla \psi^{h} \cdot \nabla \phi^{h} \; d\Omega = 0
+	\end{split}
+\end{equation}
+ここで$\tau_\phi$, $\tau_{LSIC}$はそれぞれ式(\ref{ls-tau_phi}), (\ref{ls-tau_LSIC})に示すSUPG項と衝撃捕捉項の安定化パラメータである。
+\begin{equation}
+\label{ls-tau_phi}
+	\tau_{\phi} = \left[ \left(\frac{2}{\Delta t} \right)^2 + \left(\frac{2 \| \bm{u}^{h} \|}{h_{e}} \right)^2 \right]^{-1/2}
+\end{equation}
+
+\begin{equation}
+\label{ls-tau_LSIC}
+	\tau_{LSIC} = \frac{h_{e}}{2} \| \bm{u}^{h} \|
+\end{equation}
+
+\subsection{レベルセット法}
+レベルセット法は、自由表面の位置をレベルセット関数と呼ばれる界面からの距離関数を用いて定義する。
+自由表面流れにおけるレベルセット関数の定義は、自由表面上（界面）で0、自由表面から液体の方向に対して正、気体の方向に対して負であるものとする。
+レベルセット関数の等距離である性質としては次式(\ref{ls-charcter})を満たすものとする。
+\begin{equation}
+\label{ls-charcter}
+	| \nabla \phi | = 1
+\end{equation}
+
+レベルセット法は、任意の時間におけるレベルセット関数$\phi$から次式(\ref{ls-heaviside})に示す近似Heaviside関数$H_{D}$を用いることにより界面近傍の平滑化を行う。
+\begin{equation}
+\label{ls-heaviside}
+	H_{D} = 0.5 \cdot \max \left[-1.0, \min \left(1.0, \frac{\phi}{D} + \frac{1}{\pi} sin\left(\frac{\pi \phi}{D}\right)\right) \right]
+\end{equation}
+
+ここで$D$は界面から平滑化をする幅であり、格子幅の1-5倍程度の値を用いる。
+近似ヘビサイド関数により、密度および粘性係数は次式(\ref{ls-rho}), (\ref{ls-mu})のように表される。
+\begin{equation}
+\label{ls-rho}
+	\rho = 0.5 (\rho_l + \rho_g) + H_{D} (\rho_l - \rho_g)
+\end{equation}
+\begin{equation}
+\label{ls-mu}
+	\mu = 0.5 (\mu_l + \mu_g) + H_{D} (\mu_l - \mu_g)
+\end{equation}
+
+
+\subsection{表面張力}
+表面張力$\bm{f}_{fs}$とすると、CSF(Continuum Surface Force)モデルにより次式(\ref{sf-eq})のように算定できる。
+\begin{equation}
+\label{sf-eq}
+	\bm{f}_{fs} = \sigma \kappa \nabla \phi
+\end{equation}
+
+ここで界面の曲率$\kappa$と法線方向$\bm{n}_{s}$は以下の式(\ref{sf-nv}), (\ref{sf-kappa})のように表される。
+\begin{equation}
+\label{sf-nv}
+	\bm{n}_{s} = \frac{\nabla \phi}{| \nabla \phi |}
+\end{equation}
+
+\begin{equation}
+\label{sf-kappa}
+	\kappa = - \nabla \cdot \bm{n}_{s}
+\end{equation}
+式(\ref{sf-eq})で求められる表面張力$\bm{f}_{fs}$はNavier-Stokes方程式(\ref{fluid-ns})において体積力として作用させる。
+ここで、表面張力の計算式(\ref{sf-eq})には2階微分が含まれるので線形近似では要素内で値が0になってしまう問題がある。
+L2プロジェクションによる計算\cite{Nagrath2003}や、1階微分の値を各節点に振り分けてから1次要素で補間する方法\cite{Matsumoto2006}, \cite{Shi2019}が提案されている。
+今回は、1階微分の値を各節点に振り分けてから1次要素で補間する方法で実装した。
+
+\subsection{レベルセット関数の再初期化}
+
+レベルセット関数の再初期化はSussmanらの解法\cite{Sussman1994}としてのハミルトン・ヤコビ方程式を解くことにより再初期化する方法が使われている例が多い\cite{Himeno1999}。
+
+レベルセット関数はその性質上、勾配を定義できない特異点を持つため、特異点に関する特別な処理が必要。$\phi(\bm{x})$の収束性がパラメータ$\delta$によって変化するため最適な$\delta$を決定するのが難しい。適切なパラメータ設定などにノウハウを必要とする。再初期化ができても多大な計算時間を必要とするといった問題点が挙げられている\cite{Yamazaki2007}。
+
+収束計算を行っている間に界面近傍の値が修正されて結果的に界面位置が移動してしまうことが指摘されており、界面近傍の範囲で計算しない対応をしている例もある\cite{Tsubogo2003}。
+
+再初期化によって計算が破綻した例\cite{Shono2017}。
+
+\begin{equation}
+\label{levelset-reinitialization}
+	\frac{\partial \phi (\bm{x})}{\partial \tilde{t}} = \frac{\phi (\bm{x})}{\sqrt{\phi(\bm{x})^2 + \delta^2}}[1-|\nabla \phi (\bm{x})|]
+\end{equation}
+ここで$\tilde{t}$はレベルセット関数の移流方程式の$t$とは独立の仮想的な時間、$\delta$は$\phi(\bm{x})/\sqrt{\phi(\bm{x})^2+\delta^2}$を$sgn(\phi(\bm{x}))$に近似するためのパラメータである。
+
+\subsection{保存型レベルセット関数の再初期化}
+Olssonらによって提案されたConservative Levelset Method(CLSM)\cite{Olsson2005}, \cite{Olsson2007}。
+有限要素法に基づいた定式化までされている文献\cite{Pimenta2018}。
+保存型レベルセット関数は界面が厚い場合、界面の余計な動きが生じる。\cite{Takeuchi2018}
+CLS関数は$\epsilon$が0に近づく極限ではVOF関数Cに一致する。\cite{Nakazawa2023}
+
+CLSMでは符号付距離関数を正規化されたヘビサイド関数とすることで保存性の問題を解決する
+\begin{equation}
+\label{CLSM-heaviside}
+	\phi(\bm{x}) = \frac{1}{1+e^{d(\bm{x})/\epsilon}}
+\end{equation}
+ここで$d(\bm{x})$は符号付距離関数、$\epsilon$は振動を回避するためにスムージングする半径、インターフェース厚さとも呼ばれる。
+
+以下の式を解くことでヘビサイド関数の性質を保たせる。\cite{Olsson2007}
+\begin{equation}
+\label{CLSM-reinitialization}
+	\frac{\partial \phi}{\partial \tau} + \nabla \cdot [\phi(1-\phi)\bm{n}_{\Gamma}] = \epsilon \nabla \cdot [\bm{n}_{\Gamma}(\nabla \phi \cdot \bm{n}_{\Gamma})]
+\end{equation}
+ここで$\bm{n}_{\Gamma}$はインターフェース$\Gamma$における単位法線ベクトルで、重要なのはこれは再初期化の間で変わらない。
+\begin{equation}
+\label{CLSM-n}
+	\bm{n}_{\Gamma} = \frac{\nabla \phi (\bm{x}, \tau_0)}{|\nabla \phi (\bm{x}, \tau_0)|}
+\end{equation}
+
+式(\ref{CLSM-reinitialization})を弱形式で表すと、
+\begin{equation}
+\label{CLSM-weakform}
+	\int_{\Omega} v \frac{\phi_c^{k+1}-\phi_c^k}{\Delta \tau} \mathrm{d} x-\int_{\Omega}\left(\frac{\phi_c^k+\phi_c^{k+1}}{2}-\phi_c^{k+1} \phi_c^k\right) \nabla v \cdot \hat{n}_*^{n+1}-\varepsilon \nabla\left(\frac{\phi_c^k+\phi_c^{k+1}}{2}\right) \cdot \hat{n}_*^{n+1}\left(\nabla v \cdot \hat{n}_*^{n+1}\right) \mathrm{d} x=0
+\end{equation}
+
+別の文献の式だとこのように書かれているが上と同じはず。
+\begin{equation}
+	\frac{1}{\Delta \tau}\left\langle\left(\phi^{n+1}-\phi^n\right), w\right\rangle-\frac{1}{2}\left\langle\nabla w,\left(\phi^{n+1}+\phi^n\right) \mathbf{n}_{\Gamma}\right\rangle+\left\langle\phi^{n+1} \phi^n \mathbf{n}_{\Gamma}, \nabla w\right\rangle +\frac{\varepsilon}{2}\left\langle\left(\nabla \phi^{n+1}+\nabla \phi^n\right) \cdot \mathbf{n}_{\Gamma}, \nabla w \cdot \mathbf{n}_{\Gamma}\right\rangle=0
+\end{equation}
+
+時間ステップは、
+\begin{equation}
+	\Delta \tau = \Delta x^{1+d} \beta
+\end{equation}
+
+インターフェース厚さは、
+\begin{equation}
+	\epsilon = \Delta x^{1-d} \beta
+\end{equation}
+ここで変数$\beta$は$0.5$が基本だが、気泡の問題などには薄い界面として0.5より小さい値を用いることも許容する。
+
+式(\ref{CLSM-weakform})をマトリクス形式に変形すると
+
+\subsection{高精度保存型レベルセット関数}
+CLS関数ではレベルセット法の長所であった界面法線ベクトルや曲率の精度が低下する\cite{Nakazawa2023}
+そこでAccurate Conservative LevelSet法(ACLS法)では関数から符号付距離関数$\phi$を再構築し、法線ベクトルや曲率を評価する方法である。

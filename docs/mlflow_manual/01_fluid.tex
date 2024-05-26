@@ -1,0 +1,116 @@
+\newpage
+\section{非圧縮性粘性流れの計算}
+\subsection{支配方程式}
+非圧縮性粘性流れの運動方程式は以下のNavier-Stokes方程式によって記述される。
+\begin{equation}
+\label{fluid-ns}
+\rho \frac{D\bm{u}}{Dt} = - \nabla p + \mu \nabla^{2} \bm{u} + \bm{f}
+\end{equation}
+ここで、$\rho$は流体の密度、$\bm{u}$は流体の速度ベクトル、$p$は流体の圧力、$\mu$は流体の粘性係数、$\bm{f}$は外力ベクトルを表す。
+また、非圧縮性流れにおける連続の式は以下のように表される。
+\begin{equation}
+\label{fluid-continuum}
+\nabla \cdot u = 0
+\end{equation}
+
+流体は非圧縮性粘性を仮定しているため、Navier-Stokes方程式(\ref{fluid-ns})と非圧縮性の連続の式(\ref{fluid-continuum})を解く。
+
+\subsection{Fractional step法}
+流体解析プログラムでは、流体を解く手法として分離型解法の一つであるFractional Step法を使用する。
+Navier-Stokes方程式(\ref{fluid-ns})において、外力項を省略し、両辺を流体の密度$\rho$で割って無次元化したNavier-Stokes方程式は以下の式(\ref{fs-ns})のように記述される。ここではEinsteinの縮約記法を用いる。
+\begin{equation}
+\label{fs-ns}
+	\frac{u^{n+1}_i - u^{n}_i}{\Delta t} + u^{n}_i \frac{\partial u^{n}_i}{\partial x_j}
+	+ \frac{\partial p^{n+1}}{\partial x_i} - \frac{1}{\mathrm{Re}} \frac{\partial^{2} u^{n}_i}{\partial x^{2}_j} = 0
+\end{equation}
+ここで$u^{n}_{i}$は$n$ステップ目における$i$方向の流速、$\mathrm{Re}$はレイノルズ数を表す。
+
+また、$n+1$ステップ目を満たす連続の式は以下の式(\ref{fs-continuum})ように記述される。
+\begin{equation}
+\label{fs-continuum}
+	\frac{\partial u_{i}^{n+1}}{\partial x_{i}}=0
+\end{equation}
+
+式(\ref{fs-continuum})の発散を取り、式(\ref{fs-ns})に代入すると以下の圧力Poisson方程式(\ref{fs-poisson})が導かれる。
+\begin{equation}
+\label{fs-poisson}
+	\frac{\partial^2 p^{n+1}}{\partial x^{2}_i} = \frac{1}{\Delta t} \frac{\partial \tilde{u}_i}{\partial x_{i}}
+\end{equation}
+
+ここで$\tilde{u}_{i}$は中間流速であり、以下の式(\ref{fs-midvel})で記述される。
+\begin{equation}
+\label{fs-midvel}
+	\tilde{u}_{i} = u_{i}^{n} - \Delta t
+	\left(u_{j}^{n} \frac{\partial u_{i}^{n}}{\partial x_{j}} 
+	- \frac{1}{\mathrm{Re}} \frac{\partial^{2} u_{i}^{n}}{\partial x_{j}^{2}}\right)
+\end{equation}
+
+圧力Poisson方程式(\ref{fs-poisson})を解いて求めた$n+1$ステップ目の圧力$p^{n+1}$を使って速度を修正することで$n+1$ステップ目の流速$u^{n+1}_{i}$を次式(\ref{fs-correct})により求める。
+\begin{equation}
+\label{fs-correct}
+	u^{n+1}_i=\tilde{u}_i - \Delta t \frac{\partial p^{n+1}}{\partial x_i}
+\end{equation}
+
+\subsection{SUPG法による安定化有限要素法の定式化}
+Navier-Stokes方程式を数値的に解く時、移流項が卓越する場合には数値的な不安定性が生じるという問題がある。
+有限要素法において、移流項による数値不安定性を防ぐ方法として、SUPG(Streamline Upwind/Petrov-Galerkin)法が提案された。SUPG法は、移流項の重みを変化させることで、流れの流線方向にのみ安定化させることができる手法である。
+
+Fractional Step法を用いて定式化した式(\ref{fs-midvel})・(\ref{fs-poisson})・(\ref{fs-correct})にSUPG法を適用する。
+Galerkin法に基づいて、流速の重み関数$w_{i}$、流速$u_{i}$、中間流速$\tilde{u}_{i}$、圧力の重み関数$q$、圧力$p$を次の式(\ref{supg-fs})ように近似する。
+\begin{equation}
+\label{supg-fs}
+	\begin{split}
+		w_{i}^{h}=&N_{\alpha}^{e} w_{i\alpha}^{e},\; u_{i}^{h}=N_{\alpha}^{e} u_{i\alpha}^{e},\; 
+		\tilde{u}_{i}^{h}=N_{\alpha}^{e} \tilde{u}_{i\alpha}^{e}, \\
+		q^{h}=&L_{\alpha}^{e} q_{\alpha}^{e}, \; p^{h}=L_{\alpha}^{e} p_{\alpha}^{e} \\
+	\end{split}
+\end{equation}
+ここで$u_{i\alpha}^{e}$、$\tilde{u}_{i\alpha}^{e}$、$p_{\alpha}$はそれぞれ流速、中間流速、圧力の節点値である。また、$N_{\alpha}$、$L_{\alpha}$はそれぞれ流速場と圧力場に対する形状関数である。$e$は要素のインデックスを表す。
+
+中間流速を求める式は以下の式(\ref{supg-midvel})の通り。
+\begin{equation}
+\label{supg-midvel}
+	\begin{split}
+		\int_{\Omega} w_{i}\left( \frac{\tilde{u}-u^{n}_i}{\Delta t} + u^{n}_{j} \frac{\partial u^{n}_{i}}{\partial x_{j}}\right) \; d\Omega \;+ 
+		\int_{\Omega} \frac{1}{\mathrm{Re}} \frac{\partial w_{i}}{\partial x_{j}} \frac{\partial u^{n}_{i}}{\partial x_{j}} \; d\Omega \;+& \\
+		\sum_{e=1}^{M} \int_{\Omega_{e}} \tau_{m} u_{j}^{n} \frac{\partial w_{i}^{h}}{\partial x_{j}} \left( \frac{\tilde{u_{i}} - u_{i}^{n}}{\Delta t} + u_{j}^{n} \frac{\partial u_{i}^{n}}{\partial x_{j}} - \frac{1}{Re} \frac{\partial^{2} u_{i}^{n}}{\partial x_{j}^{2}}\right) \; d\Omega \;=& 
+		\int_{\Gamma_{h}} w_{i}\frac{1}{\mathrm{Re}} \frac{\partial u_{i}}{\partial x_{j}}n_{j} \;d\Gamma
+	\end{split}
+\end{equation}
+
+ここで$e$は要素のインデックス、$M$は全要素数、$\Omega_{e}$は要素領域、$\tau_{m}$は安定化パラメータであり、要素での安定化パラメータ$\tau_{m}^{e}$は次式(\ref{supg-tau})で与えられる。
+\begin{equation}
+\label{supg-tau}
+	\tau_{m}^{e}=\left[ \left(\frac{2}{\Delta t}\right)^{2} + \left(\frac{2||\bm{u}||}{h_{e}}\right)^{2} + \left(\frac{4}{\mathrm{Re_{v}} h_{e}^{2}}\right)^{2}\right]^{-1/2}
+\end{equation}
+$\Delta t$は時間刻み幅、$\bm{u}$は流速、$h_e$は要素サイズ、$\mathrm{Re_u}$は要素レイノルズ数である。
+
+圧力ポアソン方程式は以下の式(\ref{supg-poisson})のようになる。
+\begin{equation}
+\label{supg-poisson}
+	\int_{\Omega} q \frac{\partial^{2}p^{n+1}}{\partial x_{i}^{2}} \; d\Omega = 
+	\frac{1}{\Delta t} \int_{\Omega} q \frac{\partial \tilde{u}_{i}}{\partial x_{i}} \; d\Omega
+\end{equation}
+
+速度の修正の式は以下の式(\ref{supg-correct})のようになる。
+\begin{equation}
+\label{supg-correct}
+	\int_{\Omega} w_{i}u_{i}^{n+1} \; d\Omega = \int_{\Omega} w_{i} \tilde{u}_{i} \; d\Omega
+	- \Delta t \int_{\Omega} w_{i} \frac{\partial p^{n+1}}{\partial x_{i}} d\Omega
+\end{equation}
+
+式(\ref{supg-midvel})・(\ref{supg-poisson})・(\ref{supg-correct})を行列で表すとそれぞれ式(\ref{matrix-midvel})・(\ref{matrix-poisson})・(\ref{matrix-correct})になる。ただし、式(\ref{supg-poisson})に対しては部分積分を行う。
+\begin{equation}
+\label{matrix-midvel}
+	( \bm{M} + \bm{M}_{s} ) \frac{\tilde{\bm{u}}_i - \bm{u}_{i}^{n}}{\Delta t} + ( \bm{A} + \bm{A}_s ) \bm{u}_{i}^{n} + \bm{D} \bm{u}_{i}^{n} = 0
+\end{equation}
+
+\begin{equation}
+\label{matrix-poisson}
+	-\bm{G} \bm{p}^{n+1} = \frac{1}{\Delta t} \bm{C} \tilde{\bm{u}}_{i} - \bm{G}_{\Gamma}
+\end{equation}
+
+\begin{equation}
+\label{matrix-correct}
+	\bm{M} \bm{u}_{i}^{n+1} = \bm{M} \tilde{\bm{u}}_{i} - \Delta t \bm{C} \bm{p}^{n+1}
+\end{equation}
