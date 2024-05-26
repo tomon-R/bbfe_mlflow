@@ -44,6 +44,7 @@ static const char* INPUT_FILENAME_LEVELSET= "levelset.dat";
 
 static const char* OUTPUT_FILENAME_VTK    = "result_%d_%06d.vtk";
 static const char* OUTPUT_FILENAME_DAMBREAK = "result_dambreak.csv";
+static const char* OUTPUT_FILENAME_BUBBLE = "result_bubble.csv";
 
 
 typedef struct
@@ -1299,7 +1300,7 @@ void output_result_dambreak_data(
 			fprintf(fp, "%lf\n", z_zero);
 			//fprintf(fp, "%lf, %lf\n", z2, p2);
 		}else if(abs(pairs_z[i].value)<eps){
-			fprintf(fp, "%lf\n, ", pairs_z[i].key);
+			fprintf(fp, "%lf\n", pairs_z[i].key);
 		}
 	}
 
@@ -1311,6 +1312,126 @@ void output_result_dambreak_data(
 	free(pairs_z);
 
 	fclose(fp);
+
+}
+
+/**********************************************************
+ * Output Rising Bubble Data
+ **********************************************************/
+double calc_data_bubble(
+			BBFE_DATA*   fe,
+			BBFE_BASIS*  basis,
+			VALUES*      vals,
+			double*      data)
+{
+	double mean_vel_z = 0;
+	double mean_pos_z = 0;
+	double total_vol = 0;
+
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
+
+	double*  vel_ip;
+	double*  pos_ip;
+	double*  vol_ip;
+	double*  Jacobian_ip;
+	vel_ip      = BB_std_calloc_1d_double(vel_ip     , np);
+	pos_ip      = BB_std_calloc_1d_double(pos_ip     , np);
+	vol_ip      = BB_std_calloc_1d_double(vol_ip     , np);
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	double** local_v;
+	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
+	double** v_ip; 
+	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
+
+	double** local_x;
+	local_x = BB_std_calloc_2d_double(local_x, nl, 3);
+	double** x_ip; 
+	x_ip = BB_std_calloc_2d_double(x_ip, np, 3);
+
+	double* local_heaviside;
+	local_heaviside = BB_std_calloc_1d_double(local_heaviside, nl);
+	double* heaviside_ip;
+	heaviside_ip = BB_std_calloc_1d_double(heaviside_ip, np);
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		double vol = BBFE_std_integ_calc_volume(
+				np, basis->integ_weight, Jacobian_ip);
+		double h_e = cbrt(vol);
+
+		BBFE_elemmat_set_local_array_vector(local_v, fe, vals->v, e, 3);
+		BBFE_elemmat_set_local_array_vector(local_x, fe, fe->x, e, 3);
+		BBFE_elemmat_set_local_array_scalar(local_heaviside, fe, vals->heaviside, e);
+
+		for(int p=0; p<np; p++) {
+			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);	
+			BBFE_std_mapping_vector3d(x_ip[p], nl, local_x, basis->N[p]);	
+			heaviside_ip[p]  = BBFE_std_mapping_scalar(nl, local_heaviside, basis->N[p]);
+		}
+
+		for(int i=0; i<nl; i++) {
+			for(int p=0; p<np; p++) {
+				vel_ip[p] = basis->N[p][i] * (0.5 * (0+v_ip[p][2]) + heaviside_ip[p] * (0-v_ip[p][2]));
+				pos_ip[p] = basis->N[p][i] * (0.5 * (0+x_ip[p][2]) + heaviside_ip[p] * (0-x_ip[p][2])) ;
+				vol_ip[p] = basis->N[p][i] *  (0.5 * (0+1) + heaviside_ip[p] * (0-1));
+			}
+			double integ_vel = BBFE_std_integ_calc(
+					np, vel_ip, basis->integ_weight, Jacobian_ip);
+
+			double integ_pos = BBFE_std_integ_calc(
+					np, pos_ip, basis->integ_weight, Jacobian_ip);
+
+			double integ_vol = BBFE_std_integ_calc(
+					np, vol_ip, basis->integ_weight, Jacobian_ip);
+
+			mean_vel_z += integ_vel;
+			mean_pos_z += integ_pos;
+			total_vol += integ_vol;
+		}
+	}
+
+	data[0] = mean_pos_z / total_vol;
+	data[1] = mean_vel_z / total_vol;
+	data[2] = total_vol / (0.25*0.25*0.25*4/3*M_PI);
+	data[3] = 0;
+	
+	BB_std_free_1d_double(vel_ip,      np);
+	BB_std_free_1d_double(Jacobian_ip, np);
+
+	BB_std_free_2d_double(local_v, nl, 3);
+	BB_std_free_2d_double(v_ip, np, 3);
+
+	BB_std_free_1d_double(local_heaviside, nl);
+	BB_std_free_1d_double(heaviside_ip, np);
+}
+
+void output_result_bubble_data(
+			FE_SYSTEM* sys,
+			const char* directory,
+			double time)
+{
+	char filename[BUFFER_SIZE];
+	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_BUBBLE);
+
+	FILE* fp;
+	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
+
+	double* data = BB_std_calloc_1d_double(data, 4);
+
+	calc_data_bubble(&(sys->fe), &(sys->basis),&(sys->vals), data);
+
+	double eps = 1e-10;
+	if(abs(time-0.0)<eps){
+		fprintf(fp, "%s, %s, %s, %s, %s\n", "Time", "z", "vz", "sphericity", "size");
+	}
+	fprintf(fp, "%lf, %lf, %lf, %lf, %lf\n", time, data[0], data[1], data[2], data[3]);
+	
+	fclose(fp);
+
+	BB_std_free_1d_double(data, 4);
 
 }
 
@@ -1367,6 +1488,7 @@ int main(
 	int file_num = 0;
 	output_files(&sys, file_num, t);
 	output_result_dambreak_data(&sys, sys.cond.directory, t);
+	output_result_bubble_data(&(sys), sys.cond.directory, t);
 
 	while (t < sys.vals.finish_time) {
 		t += sys.vals.dt;
@@ -1512,6 +1634,8 @@ int main(
 
 			output_files(&sys, file_num+1, t);
 			output_result_dambreak_data(&sys, sys.cond.directory, t);
+			output_result_bubble_data(&(sys), sys.cond.directory, t);
+
 			file_num += 1;
 		}
 
