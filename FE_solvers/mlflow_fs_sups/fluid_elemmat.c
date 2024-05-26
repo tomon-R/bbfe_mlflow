@@ -26,7 +26,6 @@ double elemmat_supg_coef(
 		+ (4.0*nu/(h_e*h_e))*(4.0*nu/(h_e*h_e));
 
 	double val = sqrt(1.0/denom);
-
 	return (val);
 }
 
@@ -48,7 +47,6 @@ double BBFE_elemmat_fluid_sups_coef(
 		+ (4.0*nu/(h_e*h_e))*(4.0*nu/(h_e*h_e));
 
 	double val = sqrt(1.0/denom);
-
 	return (val);
 }
 
@@ -144,9 +142,10 @@ void BBFE_elemmat_fluid_sups_vec(
 
 		val += density * tau * BB_calc_vec3d_dot(v, grad_N_i) * v[d];
 
+		/* external force */
 		val += density * N_i * gravity[d] * dt;
-
-		val += surf_tension[d];
+		val += surf_tension[d] * dt;
+		val += (density * N_i * gravity[d] * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v, grad_N_i);
 
 		vec[d] = val;
 	}

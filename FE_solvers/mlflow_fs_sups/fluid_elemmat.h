@@ -42,4 +42,4 @@ void BBFE_elemmat_fluid_sups_vec(
 		const double   tau,
 		const double   dt,
 		const double*  gravity,
-		double* surf_tension_vec);
+		double*  surf_tension_vec);
