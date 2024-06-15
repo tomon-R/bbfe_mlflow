@@ -84,8 +84,23 @@ Navier-Stokes方程式(\ref{fluid-ns})と連続の式(\ref{fluid-continuum})で�
 L2プロジェクションによる計算\cite{Nagrath2003}や、1階微分の値を各節点に振り分けてから1次要素で補間する方法\cite{Matsumoto2006}, \cite{Shi2019}が提案されている。
 今回は、1階微分の値を各節点に振り分けてから1次要素で補間する方法で実装した。
 
+表面張力は界面に発生するため、計算時は近似デルタ関数を用いて離散化した。
+近似デルタ関数$\delta_{\alpha}$は以下の式で計算される。
+
+\begin{equation}
+\label{delta-function}
+	\frac{d H_\alpha(\phi)}{d \phi} = \delta_\alpha(\phi) = \left\{\begin{array}{l}0, \text { for } \alpha \leq \phi \\ 
+															\frac{1}{2 \alpha}\left[1+\cos \left(\frac{\pi \phi}{\alpha}\right)\right], \text { for }-\alpha<\phi<\alpha \\
+															 0, \text { for } \phi \leq-\alpha\end{array}\right.
+\end{equation}
+
+ここで$\alpha$は、界面厚さである。
+
+
+
 \subsection{レベルセット関数の再初期化}
 
+%\subsubsection{一般的な方法}
 レベルセット関数の再初期化はSussmanらの解法\cite{Sussman1994}としてのハミルトン・ヤコビ方程式を解くことにより再初期化する方法が使われている例が多い\cite{Himeno1999}。
 
 レベルセット関数はその性質上、勾配を定義できない特異点を持つため、特異点に関する特別な処理が必要。$\phi(\bm{x})$の収束性がパラメータ$\delta$によって変化するため最適な$\delta$を決定するのが難しい。適切なパラメータ設定などにノウハウを必要とする。再初期化ができても多大な計算時間を必要とするといった問題点が挙げられている\cite{Yamazaki2007}。
@@ -96,11 +111,25 @@ L2プロジェクションによる計算\cite{Nagrath2003}や、1階微分の�
 
 \begin{equation}
 \label{levelset-reinitialization}
+	\frac{\partial \phi (\bm{x})}{\partial \tilde{t}} = S(\phi)[1-|\nabla \phi (\bm{x})|]
+\end{equation}
+ここで、
+\begin{equation}
+\label{levelset-reinitialization}
+	S(\phi) = \frac{\phi (\bm{x})}{\sqrt{\phi(\bm{x})^2 + \delta^2}} \simeq sgn(\phi)
+\end{equation}
+
+$sgn(\phi)$は$phi>0$で$1$, $\phi=0$で$0$, $\phi<0$で$-1$を取る。
+したがって、$|\phi|=1$からずれた分をエラーとして$\phi$に加える。
+
+\begin{equation}
+\label{levelset-reinitialization}
 	\frac{\partial \phi (\bm{x})}{\partial \tilde{t}} = \frac{\phi (\bm{x})}{\sqrt{\phi(\bm{x})^2 + \delta^2}}[1-|\nabla \phi (\bm{x})|]
 \end{equation}
 ここで$\tilde{t}$はレベルセット関数の移流方程式の$t$とは独立の仮想的な時間、$\delta$は$\phi(\bm{x})/\sqrt{\phi(\bm{x})^2+\delta^2}$を$sgn(\phi(\bm{x}))$に近似するためのパラメータである。
 
-\subsection{保存型レベルセット関数の再初期化}
+\begin{comment}
+\subsubsection{保存型レベルセット関数の再初期化}
 Olssonらによって提案されたConservative Levelset Method(CLSM)\cite{Olsson2005}, \cite{Olsson2007}。
 有限要素法に基づいた定式化までされている文献\cite{Pimenta2018}。
 保存型レベルセット関数は界面が厚い場合、界面の余計な動きが生じる。\cite{Takeuchi2018}
@@ -148,6 +177,58 @@ CLSMでは符号付距離関数を正規化されたヘビサイド関数とす�
 
 式(\ref{CLSM-weakform})をマトリクス形式に変形すると
 
-\subsection{高精度保存型レベルセット関数}
+\subsubsection{高精度保存型レベルセット関数}
 CLS関数ではレベルセット法の長所であった界面法線ベクトルや曲率の精度が低下する\cite{Nakazawa2023}
 そこでAccurate Conservative LevelSet法(ACLS法)では関数から符号付距離関数$\phi$を再構築し、法線ベクトルや曲率を評価する方法である。
+\end{comment}
+\subsection{体積補正法}
+
+Levelset法では気液の体積が保存されなくなる問題が発生する。
+今回は体積保存のための体積補正法として比較的簡便な方法を使用した。
+
+時刻$t$における気体の体積$V_{gas}(t)$は以下のように計算される。
+\begin{equation}
+	V_{gas} (t) = \int_{V} (0.5 - H) dV
+\end{equation}
+
+初期の気体の体積を$V_gas(0)$として、体積の誤差は以下の式で表される。
+\begin{equation}
+	V_{error} (t) = V_gas(t) - V_gas(0)
+\end{equation}
+
+気液界面の総面積を$A(t)$として、以下の補正量を計算する。
+
+\begin{equation}
+	L_{error} (t) = \frac{V_{error}(t)}{A(t)}
+\end{equation}
+
+ここで$A(t)$は次式で求められる。
+
+\begin{equation}
+	A(t) = \int_{V} \delta_{\alpha} dV
+\end{equation}
+
+ここで$\delta_{\alpha}$はデルタ関数であり、表面張力の計算時に使用している式(\ref{delta-function})のデルタ関数である。
+
+
+
+\subsection{時間刻み幅}
+時間刻み幅は移流項に関する制限$\Delta t_{c}$、表面張力項に関する制限$\Delta t_{s}$、粘性項に関する制限$\Delta t_{v}$を満足しなければならない。
+時間制限は以下のように計算される\cite{Tsubogo2003},\cite{Sussman1994}。
+ここで$Re$はレイノルズ数、$B$はボンド数（エトベス数$Eo$と同じ。$Bo=Eo=\Delta \rho g L^2/\sigma$）である。
+
+\begin{equation}
+	\Delta t_{c} = min( \frac{\Delta \bm{x}}{|\bm{u}|})
+\end{equation}
+
+\begin{equation}
+	\Delta t_{v} = min( \frac{3}{14}(\rho(Re) \Delta \bm{x}^2 / \mu))
+\end{equation}
+
+\begin{equation}
+	\Delta t_{s} = \sqrt{(\rho_{l} + \rho_{g}) \cdot \frac{B}{8 \pi}} \cdot \Delta \bm{x}^{\frac{3}{2}}
+\end{equation}
+
+\begin{equation}
+	\Delta t^{n+1} \leq \frac{1}{2} min( \Delta t_{s}, \Delta t_{v}, \Delta t_{c})
+\end{equation}

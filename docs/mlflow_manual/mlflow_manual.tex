@@ -108,40 +108,63 @@ morecomment=[l]{//}
 
 \tableofcontents
 
-\input{01_fluid}
+%\input{01_fluid}
 \input{02_levelset}
-\input{03_code}
-\input{04_cavity}
+%\input{03_code}
+%\input{04_cavity}
 \input{05_dambreak}
 \input{06_bubble}
 
 \begin{thebibliography}{99}
 	\bibitem{Nagrath2003} Nagrath, S., Jansen, K. \& Lahey, R. T. Three Dimensional Simulation of Incompressible Two-phase Flows using a stabilized finite element method and level set approach. in vol. 56 KF.002 (2003)
+
 	\bibitem{Matsumoto2006} 松本純一, 鈴木健 \& 手塚明. 気泡関数要素安定化法を用いた気液二相流解析. 混相流研究の進展 1, 181–188 (2006)
+
 	\bibitem{Shi2019} Shi, J., Barriere, T., Liu, B. \& Cheng, Z. A simple and systematic scheme implemented in explicit FEM solver for surface tension effects in powder injection moulding process. Int. J. Mater. Form. 12, 123–134 (2019)
+
 	\bibitem{Lo2005} Lo, D. C., Murugesan, K. \& Young, D. L. Numerical solution of three-dimensional velocity-vorticity Navier-Stokes equations by finite difference method. International Journal for Numerical Methods in Fluids vol. 47 1469–1487 Preprint at https://doi.org/10.1002/fld.822 (2005)
+
+	% ３次元気泡
 	\bibitem{Safi2017} Safi, M. A., Prasianakis, N. \& Turek, S. Benchmark computations for 3D two-phase flows: A coupled lattice Boltzmann-level set study. Comput. Math. Appl. 73, 520–536 (2017)
+
 	\bibitem{Yamazaki2007} 山崎慎太郎, 西脇眞二, 泉井一浩 \& 吉村允孝. レベルセット法に基づく機械構造物の構造最適化. 日本機械学会論文集 C編 73, 72–79 (2007)
 	\bibitem{Himeno1999} 姫野武洋 \& 渡辺紀徳. 微小重力環境における気液界面挙動の数値解析. 日本機械学会論文集 B編 65, 2333–2340 (1999)
+
+	% Conservative LSM
 	\bibitem{Olsson2005} Olsson, E. \& Kreiss, G. A conservative level set method for two phase flow. J. Comput. Phys. 210, 225–246 (2005)
+
 	\bibitem{Olsson2007} Olsson, E., Kreiss, G. \& Zahedi, S. A conservative level set method for two phase flow II. J. Comput. Phys. 225, 785–807 (2007)
+
+	\bibitem{Takeuchi2018} 竹内　一貴, 田中　満, 田尻　恭平, 西田　秀利, 二重解像度格子法を用いた保存型レベルセット法の有効性, 第 32 回数値流体力学シンポジウム, (2018), \url{https://www2.nagare.or.jp/cfd/cfd32/cfd32papers/paper/E10-3.pdf}
+
+	\bibitem{Nakazawa2023} 中澤克成, 横嶋哲, 石川秀平 \& 久末信幸. レベルセット法とVOF法の基本性能評価: ACLS法，CICSAM法，THINC/WLIC法に注目して. 土木学会論文集 79, 22–00116 (2023)
+
 	\bibitem{Pimenta2018} P. Pimenta, Level Set Implementation Using FEniCS, \url{https://public.allanswered.com/userfile/4156253533-1533592794457/Paulo___Levelset_Implementation.pdf}
+
 	\bibitem{Shono2017} 生野 達大, 液圧ブロー成形のための大変形流体構造接触連成手法に関する検討, 平成28年度修士論文, \url{https://repository.dl.itc.u-tokyo.ac.jp/record/2003551/files/K-06442.pdf}
+
+	% 体積保存の式の参考
 	\bibitem{Tsubogo2003} 坪郷 浩一, 朝位 孝二, 羽田野 袈裟義, Level Set法を用いた気泡崩壊の数値計算に関する研究. 応用力学論文集 Vol.6, pp.201-208 (2003).
 	\bibitem{Sussman1994} Sussman, M., Smereka, P. \& Osher, S. A Level Set Approach for Computing Solutions to Incompressible Two-Phase Flow. J. Comput. Phys. 114, 146–159 (1994)
-	\bibitem{Takeuchi2018} 竹内　一貴, 田中　満, 田尻　恭平, 西田　秀利, 二重解像度格子法を用いた保存型レベルセット法の有効性, 第 32 回数値流体力学シンポジウム, (2018), \url{https://www2.nagare.or.jp/cfd/cfd32/cfd32papers/paper/E10-3.pdf}
-	\bibitem{Nakazawa2023} 中澤克成, 横嶋哲, 石川秀平 \& 久末信幸. レベルセット法とVOF法の基本性能評価: ACLS法，CICSAM法，THINC/WLIC法に注目して. 土木学会論文集 79, 22–00116 (2023)
+
 	\bibitem{Yamaguchi2018} Yamaguchi, N. Finite element based level set method with various reinitializations for viscous incompressible two-phase (cid:13)ows. (2018)
-	\bibitem{ToDo} \url{https://wwwold.mathematik.tu-dortmund.de/lsiii/cms/papers/MierkaDamanikTurek2012.pdf} (bubbleのcase1の履歴まで載っている)
-	\bibitem{ToDo} \url{https://www.karlin.mff.cuni.cz/~hron/NMMO403/1934_ftp.pdf} (bubbleの速度履歴と形が載っている)
-	\bibitem{ToDo} \url{https://www.diva-portal.org/smash/get/diva2:1639326/FULLTEXT01.pdf} 速度履歴あり
-	\bibitem{ToDo} \url{https://www.ljll.fr/~frey/papers/bubbles-coalescence/KlostermannJ.,%20Numerical%20simulation%20of%20a%20single%20rising%20bubble%20by%20VOF%20with%20surface%20compression.pdf}
-	\bibitem{ToDo} \url{https://wwwold.mathematik.tu-dortmund.de/lsiii/cms/papers/DamanikOuazziTurek2014.pdf}
+
+	%% ２次元気泡(bubbleのcase1の履歴まで載っている)
+	\bibitem{Mierka2016} Mierka, O. \& Turek, S. Numerical simulation of monodispersed droplet generation in nozzles. in Process-Spray 493–516 (Springer International Publishing, Cham, 2016).
+	%% ２次元気泡(bubbleの速度履歴と形が載っている)
+	\bibitem{Hysing2009} Hysing, S. et al. Quantitative benchmark computations of two‐dimensional bubble dynamics. Int. J. Numer. Methods Fluids 60, 1259–1288 (2009).
+	%% ２次元気泡(bubbleの速度履歴と形が載っている)
+	\bibitem{Klostermann2013} Klostermann, J., Schaake, K. \& Schwarze, R. Numerical simulation of a single rising bubble by VOF with surface compression. International Journal for Numerical Methods in Fluids 71, 960–982 (2013).
 
 	%% ダムブレイクのV&V
 	\bibitem{Okumura2009} 奥村弘 \& 丸岡晃. 自由界面問題に対する Semi-Lagrange Galerkin (SLG) 法の評価. 応用力学論文集 12, 155–162 (2009)
+
 	\bibitem{Koshizuka1996} Koshizuka, S., \& Oka, Y. (1996). Moving-particle semi-implicit method for fragmentation of incompressible fluid. Nuclear science and engineering, 123(3), 421-434.
+
 	\bibitem{Martin1952} Martin, J. C. \& Moyce, W. J. Part IV. An experimental study of the collapse of liquid columns on a rigid horizontal plane. Philos. Trans. R. Soc. Lond. 244, 312–324 (1952).
+
+	%% スロッシング
+	\bibitem{Himeno2023} https://www8.cao.go.jp/space/comittee/05-yuso/yuso-dai4/siryou3-1.pdf
 \end{thebibliography}
 
 \end{document}
