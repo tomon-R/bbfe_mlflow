@@ -61,6 +61,9 @@ typedef struct
 	double viscosity_l, viscosity_g;
 	double* gravity;
 
+	double volume_g_init;
+	double volume_l_init;
+
 	double** v;
 	double*  p;
 	double*  density;
@@ -422,9 +425,7 @@ void set_element_mat(
 
 		for(int i=0; i<nl; i++) {
 			for(int j=0; j<nl; j++) {
-
 				for(int p=0; p<np; p++) {
-
 					double tau = BBFE_elemmat_fluid_sups_coef(
 							density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
@@ -487,6 +488,8 @@ void set_element_vec(
 
 	double** v_ip; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
+	double*** grad_v_ip;
+	grad_v_ip = BB_std_calloc_3d_double(grad_v_ip, np, 3, 3);
 
 	double* local_viscosity;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
@@ -527,6 +530,7 @@ void set_element_vec(
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
 			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
+			BBFE_std_mapping_vector3d_grad(grad_v_ip[p], nl, local_v, fe->geo[e][p].grad_N);
 
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
@@ -538,17 +542,23 @@ void set_element_vec(
 
 			for(int p=0; p<np; p++) {
 				double tau = BBFE_elemmat_fluid_sups_coef(
-						density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+							density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
 				BBFE_elemmat_vec_surface_tension(
 						basis->N[p][i], fe->geo[e][p].grad_N[i], levelset_ip[p], grad_phi_ip[p], 
 						vals->surf_tension_coef, surf_tension_ip[p], vals->epsilon_reinit);
 
 				double vec[4];
+				//*
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
 						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p]);
-
+				//*/
+				/*
+				BBFE_elemmat_fluid_sups_vec_crank_nicolson(
+						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
+						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p]);
+				//*/
 				for(int d=0; d<4; d++) {
 					val_ip[d][p] = vec[d];
 				}
@@ -574,6 +584,7 @@ void set_element_vec(
 	BB_std_free_1d_double(Jacobian_ip, np);
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
+	BB_std_free_3d_double(grad_v_ip, np, 3, 3);
 
 	// for multilayer flow
 	BB_std_free_1d_double(local_density, nl);
@@ -1435,6 +1446,119 @@ void output_result_bubble_data(
 
 }
 
+/**********************************************************
+ * Volume correction
+ **********************************************************/
+
+int sgn(int x) {
+    if (x > 0) return 1;
+    else if (x < 0) return -1;
+    else return 0;
+}
+
+void BBFE_mlflow_volume_correction(
+		BBFE_DATA*   fe,
+		BBFE_BASIS*  basis,
+		VALUES*      vals,
+		int          step)
+{
+	// calculate volume of gas
+	double vol_gas = 0;
+	double vol_interface = 0;
+
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
+
+	double*  vol_g_ip;
+	double*  vol_i_ip;
+	double*  Jacobian_ip;
+	vol_g_ip      = BB_std_calloc_1d_double(vol_g_ip     , np);
+	vol_i_ip      = BB_std_calloc_1d_double(vol_i_ip     , np);
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	double* local_heaviside;
+	local_heaviside = BB_std_calloc_1d_double(local_heaviside, nl);
+	double* heaviside_ip;
+	heaviside_ip = BB_std_calloc_1d_double(heaviside_ip, np);
+
+	double* local_levelset;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double* levelset_ip;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		double vol = BBFE_std_integ_calc_volume(
+				np, basis->integ_weight, Jacobian_ip);
+		double h_e = cbrt(vol);
+
+		BBFE_elemmat_set_local_array_scalar(local_heaviside, fe, vals->heaviside, e);
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+
+		for(int p=0; p<np; p++) {	
+			heaviside_ip[p]  = BBFE_std_mapping_scalar(nl, local_heaviside, basis->N[p]);
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
+		}
+
+		for(int i=0; i<nl; i++) {
+			for(int p=0; p<np; p++) {
+				double alpha = vals->size_interface;
+				double delta;
+
+				vol_g_ip[p] = basis->N[p][i] *  (0.5 - heaviside_ip[p]);
+
+				if(abs(levelset_ip[p]) <= alpha){
+					delta = (1 + cos(M_PI*levelset_ip[p]/alpha))/(2*alpha);
+				}else{
+					delta = 0;
+				}
+				vol_i_ip[p] = basis->N[p][i] * delta;
+			}
+			double integ_vol_g = BBFE_std_integ_calc(
+					np, vol_g_ip, basis->integ_weight, Jacobian_ip);
+			double integ_vol_i = BBFE_std_integ_calc(
+					np, vol_i_ip, basis->integ_weight, Jacobian_ip);
+
+			vol_gas += integ_vol_g;
+			vol_interface += integ_vol_i;
+		}
+	}
+	// MPI
+	//monolis_allreduce_C(1, &vol_gas, MONOLIS_MPI_SUM, &(sys->mono_com));
+	//monolis_allreduce_C(1, &vol_interface, MONOLIS_MPI_SUM, &(sys->mono_com));
+
+	double vol_gas_error = vol_gas - vals->volume_g_init;
+
+	// calculate L_error
+	double L_error = vol_gas_error/vol_interface;
+
+	// add L_error to levelset
+	if(step == 0){
+		vals->volume_g_init = vol_gas;
+		//monolis_allreduce_C(1, &vals->vol_g_init, MONOLIS_MPI_SUM, &(sys->mono_com));
+
+		printf("Volume of gas at T=0: %lf\n", vals->volume_g_init);
+	}else if(step > 0){
+		printf("V_g(0): %lf, V_g(%d): %lf, V_g(%d)/V_g(0): %lf (%)\n", 
+			vals->volume_g_init, step, vol_gas, step, vol_gas/vals->volume_g_init*100);
+
+		for(int i=0; i<(fe->total_num_nodes); i++) {
+			vals->levelset[i] += L_error;
+		}
+	}
+	
+	BB_std_free_1d_double(vol_g_ip,      np);
+	BB_std_free_1d_double(vol_i_ip,      np);
+	BB_std_free_1d_double(Jacobian_ip, np);
+
+	BB_std_free_1d_double(local_heaviside, nl);
+	BB_std_free_1d_double(heaviside_ip, np);
+
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(levelset_ip, np);
+}
+
 int main(
 		int   argc,
 		char* argv[])
@@ -1479,8 +1603,8 @@ int main(
 
 	filename = monolis_get_global_input_file_name(MONOLIS_DEFAULT_TOP_DIR, MONOLIS_DEFAULT_PART_DIR, INPUT_FILENAME_LEVELSET);
 	read_levelset_file(&(sys.fe), &(sys.vals), filename, sys.cond.directory);
-	//BBFE_fluid_convert_levelset2CLSM(sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
-	BBFE_fluid_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+	//BBFE_mlflow_convert_levelset2CLSM(sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+	BBFE_mlflow_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
 
 	/****************** solver ********************/
 	double t = 0.0;
@@ -1489,6 +1613,9 @@ int main(
 	output_files(&sys, file_num, t);
 	output_result_dambreak_data(&sys, sys.cond.directory, t);
 	output_result_bubble_data(&(sys), sys.cond.directory, t);
+
+	// calculate initial volume of gas
+	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), step);
 
 	while (t < sys.vals.finish_time) {
 		t += sys.vals.dt;
@@ -1511,16 +1638,16 @@ int main(
 		}
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
-		BBFE_fluid_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+		BBFE_mlflow_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
 		//*
-		BBFE_fluid_renew_vals_by_levelset(
+		BBFE_mlflow_renew_vals_by_levelset(
 				sys.vals.heaviside, 
 				sys.vals.density,
 				sys.vals.density_l,
 				sys.vals.density_g,
 				sys.fe.total_num_nodes);
 
-		BBFE_fluid_renew_vals_by_levelset(
+		BBFE_mlflow_renew_vals_by_levelset(
 				sys.vals.heaviside, 
 				sys.vals.viscosity,
 				sys.vals.viscosity_l,
@@ -1528,14 +1655,14 @@ int main(
 				sys.fe.total_num_nodes); //*/
 
 		/*
-		BBFE_fluid_renew_vals_by_CLSM(
+		BBFE_mlflow_renew_vals_by_CLSM(
 				sys.vals.levelset, 
 				sys.vals.density,
 				sys.vals.density_l,
 				sys.vals.density_g,
 				sys.fe.total_num_nodes);
 
-		BBFE_fluid_renew_vals_by_levelset(
+		BBFE_mlflow_renew_vals_by_levelset(
 				sys.vals.levelset, 
 				sys.vals.viscosity,
 				sys.vals.viscosity_l,
@@ -1594,7 +1721,7 @@ int main(
 				sys.vals.mat_max_iter,
 				sys.vals.mat_epsilon);
 
-		BBFE_fluid_renew_levelset(
+		BBFE_mlflow_renew_levelset(
 				sys.vals.levelset, 
 				sys.mono_levelset.mat.R.X,
 				sys.fe.total_num_nodes);
@@ -1621,6 +1748,9 @@ int main(
 		printf("%s --- Reinitialization step ---\n", CODENAME);
 		reinit_levelset(&(sys));
 		//reinit_CLSM(&(sys));
+
+		//printf("%s --- Volume correction step ---\n", CODENAME);
+		BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), step);
 
 		/**********************************************/
 
