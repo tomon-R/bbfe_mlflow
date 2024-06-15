@@ -7,7 +7,7 @@
 /**********************************************************
  * Renew values based on levelset function
  **********************************************************/
-void BBFE_fluid_renew_vals_by_levelset(
+void BBFE_mlflow_renew_vals_by_levelset(
 		double* levelset,
 		double* val_vec,
 		double val_l,
@@ -19,7 +19,7 @@ void BBFE_fluid_renew_vals_by_levelset(
 	}
 }
 
-void BBFE_fluid_renew_vals_by_CLSM(
+void BBFE_mlflow_renew_vals_by_CLSM(
 		double* levelset,
 		double* val_vec,
 		double val_l,
@@ -31,7 +31,7 @@ void BBFE_fluid_renew_vals_by_CLSM(
 	}
 }
 
-void BBFE_fluid_convert_levelset2heaviside(
+void BBFE_mlflow_convert_levelset2heaviside(
 		double* heaviside,
 		double* levelset,
 		const double size_interface,
@@ -45,7 +45,7 @@ void BBFE_fluid_convert_levelset2heaviside(
 	}
 }
 
-void BBFE_fluid_convert_levelset2CLSM(
+void BBFE_mlflow_convert_levelset2CLSM(
 		double* levelset,
 		const double size_interface,
 		const int total_num_nodes)
@@ -56,7 +56,7 @@ void BBFE_fluid_convert_levelset2CLSM(
 	}
 }
 
-void BBFE_fluid_renew_levelset(
+void BBFE_mlflow_renew_levelset(
 		double* v,
 		double* ans_vec,
 		const int total_num_nodes)
