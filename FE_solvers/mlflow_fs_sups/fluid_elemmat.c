@@ -134,7 +134,7 @@ void BBFE_elemmat_fluid_sups_vec(
 		const double   dt,
 		const double*  gravity,
 		const double*  surf_tension,
-		const double*  accel
+		const double*  accel_inertia
 		)
 {
 	for(int d=0; d<3; d++) {
@@ -145,9 +145,9 @@ void BBFE_elemmat_fluid_sups_vec(
 		val += density * tau * BB_calc_vec3d_dot(v, grad_N_i) * v[d];
 
 		/* external force */
-		val += density * N_i * (gravity[d] + accel[d]) * dt;
+		val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
 		val += surf_tension[d] * dt;
-		val += (density * N_i * (gravity[d] + accel[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v, grad_N_i);
+		val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v, grad_N_i);
 
 		vec[d] = val;
 	}
@@ -243,7 +243,7 @@ void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 		const double   dt,
 		const double*  gravity,
 		const double*  surf_tension,
-		const double*  accel)
+		const double*  accel_inertia)
 {
 	for(int d=0; d<3; d++) {
 		double val = 0.0;
@@ -275,9 +275,9 @@ void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 			val += - density * dt * 0.5 * (D_31 + D_32 + D_33);
 		}
 		/* external force */
-		val += density * N_i * (gravity[d] + accel[d]) * dt;
+		val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
 		val += surf_tension[d] * dt;
-		val += (density * N_i * (gravity[d] + accel[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v, grad_N_i);
+		val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v, grad_N_i);
 
 		vec[d] = val;
 	}

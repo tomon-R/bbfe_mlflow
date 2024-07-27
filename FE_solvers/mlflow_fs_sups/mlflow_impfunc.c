@@ -73,6 +73,7 @@ void BBFE_mlflow_renew_acceleration(
 	double t)
 {
 	for(int i=0; i<3; i++){
-		accel[i] = accel_amp[i] * accel_angle_vel[i] * accel_angle_vel[i] * sin(accel_angle_vel[i] * t);
+		//The inertial force due to acceleration is in the opposite direction, so it has a negative sign
+		accel[i] = - accel_amp[i] * accel_angle_vel[i] * accel_angle_vel[i] * sin(accel_angle_vel[i] * t);
 	}
 }

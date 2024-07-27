@@ -66,7 +66,7 @@ typedef struct
 	double* gravity;
 	double* accel_amp;
 	double* accel_angle_vel;
-	double* accel;
+	double* accel_inertia;
 
 	double volume_g_init;
 	double volume_l_init;
@@ -157,16 +157,17 @@ void assign_default_values(
 	vals->gravity[2] = DVAL_GRAVITY;
 
 	vals->accel_amp = BB_std_calloc_1d_double(vals->accel_amp, 3);
-	vals->accel_angle_vel = BB_std_calloc_1d_double(vals->accel_angle_vel, 3);
-	vals->accel = BB_std_calloc_1d_double(vals->accel, 3);
 	vals->accel_amp[0] = DVAL_ACCEL_AMP;
 	vals->accel_amp[1] = DVAL_ACCEL_AMP;
 	vals->accel_amp[2] = DVAL_ACCEL_AMP;
+	vals->accel_angle_vel = BB_std_calloc_1d_double(vals->accel_angle_vel, 3);
 	vals->accel_angle_vel[0] = DVAL_ACCEL_ANGLE_VEL; 
 	vals->accel_angle_vel[1] = DVAL_ACCEL_ANGLE_VEL; 
 	vals->accel_angle_vel[2] = DVAL_ACCEL_ANGLE_VEL;
-	vals->accel = BB_std_calloc_1d_double(vals->accel, 3);
-	vals->accel[0] = vals->accel[1] = vals->accel[2] = 0;
+	vals->accel_inertia = BB_std_calloc_1d_double(vals->accel_inertia, 3);
+	vals->accel_inertia[0] = 0;
+	vals->accel_inertia[1] = 0;
+	vals->accel_inertia[2] = 0;
 
 	vals->surf_tension_coef = DVAL_SURF_TENSION_COEF;
 
@@ -594,12 +595,12 @@ void set_element_vec(
 				//*
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p], vals->accel);
+						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p], vals->accel_inertia);
 				//*/
 				/*
 				BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p], vals-accel);
+						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p], vals-accel_inertia);
 				//*/
 				for(int d=0; d<4; d++) {
 					val_ip[d][p] = vec[d];
@@ -1422,8 +1423,8 @@ int main(
 			sys.vals.surf_tension[m][2] = 0;
 		}
 
-		// update acceleration
-		BBFE_mlflow_renew_acceleration(sys.vals.accel, sys.vals.accel_amp, sys.vals.accel_angle_vel, t);
+		// update inertial acceleration
+		BBFE_mlflow_renew_acceleration(sys.vals.accel_inertia, sys.vals.accel_amp, sys.vals.accel_angle_vel, t);
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
 		BBFE_mlflow_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
