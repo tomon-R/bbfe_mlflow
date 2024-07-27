@@ -31,3 +31,9 @@ void BBFE_mlflow_renew_levelset(
 		double*  v,
 		double*  ans_vec,
 		const int total_num_nodes);
+
+void BBFE_mlflow_renew_acceleration(
+	double* accel, 
+	double* accel_amp,
+	double* accel_angle_vel,
+	double t);

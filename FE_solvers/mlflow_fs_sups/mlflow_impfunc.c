@@ -65,3 +65,14 @@ void BBFE_mlflow_renew_levelset(
 		v[i] = ans_vec[i];
 	}
 }
+
+void BBFE_mlflow_renew_acceleration(
+	double* accel, 
+	double* accel_amp,
+	double* accel_angle_vel,
+	double t)
+{
+	for(int i=0; i<3; i++){
+		accel[i] = accel_amp[i] * accel_angle_vel[i] * accel_angle_vel[i] * sin(accel_angle_vel[i] * t);
+	}
+}
