@@ -157,6 +157,6 @@ void BBFE_fluid_sups_renew_pressure(
 		const int total_num_nodes)
 {
 	for(int i=0; i<total_num_nodes; i++) {
-		p[i] = ans_vec[ 4*i + 3 ] / density[i];
+		p[i] = ans_vec[ 4*i + 3 ];
 	}
 }
