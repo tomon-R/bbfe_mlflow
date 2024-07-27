@@ -24,6 +24,10 @@ const char*     ID_VISCOSITY_G  = "#viscosity_g";
 const double  DVAL_VISCOSITY_G  = 1.0;
 const char*         ID_GRAVITY  = "#gravity";
 const double      DVAL_GRAVITY  = 0.0;
+const char*       ID_ACCEL_AMP  = "#accel_amp";
+const double    DVAL_ACCEL_AMP  = 0.0;
+const char*    ID_ACCEL_ANGLE_VEL  = "#accel_angle_vel";
+const double DVAL_ACCEL_ANGLE_VEL  = 0.0;
 const char*    ID_SURF_TENSION_COEF = "#surf_tension_coef";
 const double DVAL_SURF_TENSION_COEF = 0.0;
 const char*    ID_SIZE_INTERFACE = "#size_interface";
@@ -60,6 +64,9 @@ typedef struct
 	double density_l, density_g; 
 	double viscosity_l, viscosity_g;
 	double* gravity;
+	double* accel_amp;
+	double* accel_angle_vel;
+	double* accel;
 
 	double volume_g_init;
 	double volume_l_init;
@@ -149,6 +156,18 @@ void assign_default_values(
 	vals->gravity[1] = DVAL_GRAVITY;
 	vals->gravity[2] = DVAL_GRAVITY;
 
+	vals->accel_amp = BB_std_calloc_1d_double(vals->accel_amp, 3);
+	vals->accel_angle_vel = BB_std_calloc_1d_double(vals->accel_angle_vel, 3);
+	vals->accel = BB_std_calloc_1d_double(vals->accel, 3);
+	vals->accel_amp[0] = DVAL_ACCEL_AMP;
+	vals->accel_amp[1] = DVAL_ACCEL_AMP;
+	vals->accel_amp[2] = DVAL_ACCEL_AMP;
+	vals->accel_angle_vel[0] = DVAL_ACCEL_ANGLE_VEL; 
+	vals->accel_angle_vel[1] = DVAL_ACCEL_ANGLE_VEL; 
+	vals->accel_angle_vel[2] = DVAL_ACCEL_ANGLE_VEL;
+	vals->accel = BB_std_calloc_1d_double(vals->accel, 3);
+	vals->accel[0] = vals->accel[1] = vals->accel[2] = 0;
+
 	vals->surf_tension_coef = DVAL_SURF_TENSION_COEF;
 
 	vals->size_interface = DVAL_SIZE_INTERFACE;
@@ -177,6 +196,8 @@ void print_all_values(
 	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_L,        vals->viscosity_l);
 	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_G,        vals->viscosity_g);
 	printf("%s %s: %e %e %e\n", CODENAME, ID_GRAVITY, vals->gravity[0], vals->gravity[1], vals->gravity[2]);
+	printf("%s %s: %e %e %e\n", CODENAME, ID_ACCEL_AMP, vals->accel_amp[0], vals->accel_amp[1], vals->accel_amp[2]);
+	printf("%s %s: %e %e %e\n", CODENAME, ID_ACCEL_ANGLE_VEL, vals->accel_angle_vel[0], vals->accel_angle_vel[1], vals->accel_angle_vel[2]);
 	printf("%s %s: %e\n", CODENAME, ID_SURF_TENSION_COEF, vals->surf_tension_coef);
 	printf("%s %s: %e\n", CODENAME, ID_SIZE_INTERFACE, vals->size_interface);
 
@@ -231,6 +252,10 @@ void read_calc_conditions(
 				&(vals->viscosity_g), filename, ID_VISCOSITY_G, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
 				vals->gravity, filename, ID_GRAVITY, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_double_p(
+				vals->accel_amp, filename, ID_ACCEL_AMP, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_double_p(
+				vals->accel_angle_vel, filename, ID_ACCEL_ANGLE_VEL, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
 				&(vals->surf_tension_coef), filename, ID_SURF_TENSION_COEF, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
@@ -552,12 +577,12 @@ void set_element_vec(
 				//*
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p]);
+						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p], vals->accel);
 				//*/
 				/*
 				BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p]);
+						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p], vals-accel);
 				//*/
 				for(int d=0; d<4; d++) {
 					val_ip[d][p] = vec[d];
@@ -1558,6 +1583,17 @@ void BBFE_mlflow_volume_correction(
 	BB_std_free_1d_double(levelset_ip, np);
 }
 
+void BBFE_mlflow_renew_acceleration(
+	double* accel, 
+	double* accel_amp,
+	double* accel_angle_vel,
+	double t)
+{
+	for(int i=0; i<3; i++){
+		accel[i] = accel_amp[i] * accel_angle_vel[i] * accel_angle_vel[i] * sin(accel_angle_vel[i] * t);
+	}
+}
+
 int main(
 		int   argc,
 		char* argv[])
@@ -1635,6 +1671,9 @@ int main(
 			sys.vals.surf_tension[m][1] = 0;
 			sys.vals.surf_tension[m][2] = 0;
 		}
+
+		// update acceleration
+		BBFE_mlflow_renew_acceleration(sys.vals.accel, sys.vals.accel_amp, sys.vals.accel_angle_vel, t);
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
 		BBFE_mlflow_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);

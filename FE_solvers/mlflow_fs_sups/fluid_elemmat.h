@@ -42,7 +42,8 @@ void BBFE_elemmat_fluid_sups_vec(
 		const double   tau,
 		const double   dt,
 		const double*  gravity,
-		double*  surf_tension_vec);
+		const double*  surf_tension_vec,
+		const double*  accel);
 
 void BBFE_elemmat_fluid_sups_mat_crank_nicolson(
 		double         mat[4][4],
@@ -67,4 +68,5 @@ void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 		const double   tau,
 		const double   dt,
 		const double*  gravity,
-		double*  surf_tension);
+		const double*  surf_tension,
+		const double*  accel);
