@@ -1460,11 +1460,12 @@ void BBFE_mlflow_volume_correction(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis,
 		VALUES*      vals,
+		MONOLIS_COM* monolis_com,
 		int          step)
 {
 	// calculate volume of gas
-	double vol_gas = 0;
-	double vol_interface = 0;
+	double vol_gas = 0.0;
+	double vol_interface = 0.0;
 
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
@@ -1525,8 +1526,8 @@ void BBFE_mlflow_volume_correction(
 		}
 	}
 	// MPI
-	//monolis_allreduce_C(1, &vol_gas, MONOLIS_MPI_SUM, &(sys->mono_com));
-	//monolis_allreduce_C(1, &vol_interface, MONOLIS_MPI_SUM, &(sys->mono_com));
+	monolis_allreduce_R(1, &vol_gas, MONOLIS_MPI_SUM, monolis_com->comm);
+	monolis_allreduce_R(1, &vol_interface, MONOLIS_MPI_SUM, monolis_com->comm);
 
 	double vol_gas_error = vol_gas - vals->volume_g_init;
 
@@ -1536,8 +1537,6 @@ void BBFE_mlflow_volume_correction(
 	// add L_error to levelset
 	if(step == 0){
 		vals->volume_g_init = vol_gas;
-		//monolis_allreduce_C(1, &vals->vol_g_init, MONOLIS_MPI_SUM, &(sys->mono_com));
-
 		printf("Volume of gas at T=0: %lf\n", vals->volume_g_init);
 	}else if(step > 0){
 		printf("V_g(0): %lf, V_g(%d): %lf, V_g(%d)/V_g(0): %lf (%)\n", 
@@ -1615,7 +1614,7 @@ int main(
 	output_result_bubble_data(&(sys), sys.cond.directory, t);
 
 	// calculate initial volume of gas
-	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), step);
+	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), step);
 
 	while (t < sys.vals.finish_time) {
 		t += sys.vals.dt;
@@ -1750,7 +1749,7 @@ int main(
 		//reinit_CLSM(&(sys));
 
 		//printf("%s --- Volume correction step ---\n", CODENAME);
-		BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), step);
+		BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), step);
 
 		/**********************************************/
 
