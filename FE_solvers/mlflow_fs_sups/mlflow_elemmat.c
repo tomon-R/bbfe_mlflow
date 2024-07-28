@@ -43,11 +43,20 @@ double BBFE_elemmat_mat_levelset(
 		const double N_j,
 		const double grad_N_i[3],
 		const double v[3],
-		const double tau)
+		const double tau,
+		const double v_mesh[3])
 {
+	double*  v_ale;
+	v_ale = BB_std_calloc_1d_double(v_ale, 3);
+	for(int d=0; d<3; d++){
+		v_ale[d] = v[d] - v_mesh[d];
+	}
+
 	double val = 
 		N_i * N_j + 
-		tau * BB_calc_vec3d_dot(v, grad_N_i) * N_j;
+		tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * N_j;
+
+	BB_std_free_1d_double(v_ale, 3);
 
 	return val;
 }
@@ -67,17 +76,24 @@ double BBFE_elemmat_vec_levelset(
 		const double   viscosity,
 		const double   tau_supg_ml,
 		const double   tau_lsic,
-		const double   dt)
+		const double   dt,
+		const double   v_mesh[3])
 {
 	double val = 0.0;
 
+	double*  v_ale;
+	v_ale = BB_std_calloc_1d_double(v_ale, 3);
+	for(int d=0; d<3; d++){
+		v_ale[d] = v[d] - v_mesh[d];
+	}
+
 	val += - N_i *( 
-			 v[0] * grad_phi[0] + 
-			 v[1] * grad_phi[1] + 
-			 v[2] * grad_phi[2] 
+			 v_ale[0] * grad_phi[0] + 
+			 v_ale[1] * grad_phi[1] + 
+			 v_ale[2] * grad_phi[2] 
 			 );
 
-	val += - tau_supg_ml * BB_calc_vec3d_dot(v, grad_N_i) * BB_calc_vec3d_dot(v, grad_phi);
+	val += - tau_supg_ml * BB_calc_vec3d_dot(v_ale, grad_N_i) * BB_calc_vec3d_dot(v_ale, grad_phi);
 
    	val += - tau_lsic * BB_calc_vec3d_dot(grad_N_i, grad_phi);
 
@@ -85,7 +101,9 @@ double BBFE_elemmat_vec_levelset(
 
 	val += N_i * phi;
 
-	val += tau_supg_ml * BB_calc_vec3d_dot(v, grad_N_i) * phi;
+	val += tau_supg_ml * BB_calc_vec3d_dot(v_ale, grad_N_i) * phi;
+
+	BB_std_free_1d_double(v_ale, 3);
 
 	return val;
 }

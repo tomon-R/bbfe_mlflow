@@ -31,7 +31,8 @@ void BBFE_elemmat_fluid_sups_mat(
 		const double   density,
 		const double   viscosity,
 		const double   tau,
-		const double   dt);
+		const double   dt,
+		const double   v_mesh[3]);
 
 void BBFE_elemmat_fluid_sups_vec(
 		double         vec[4],
@@ -43,7 +44,8 @@ void BBFE_elemmat_fluid_sups_vec(
 		const double   dt,
 		const double*  gravity,
 		const double*  surf_tension_vec,
-		const double*  accel_inertia);
+		const double*  accel_inertia,
+		const double   v_mesh[3]);
 
 void BBFE_elemmat_fluid_sups_mat_crank_nicolson(
 		double         mat[4][4],
@@ -55,7 +57,8 @@ void BBFE_elemmat_fluid_sups_mat_crank_nicolson(
 		const double   density,
 		const double   viscosity,
 		const double   tau,
-		const double   dt);
+		const double   dt,
+		const double   v_mesh[3]);
 
 void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 		double         vec[4],
@@ -69,4 +72,5 @@ void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 		const double   dt,
 		const double*  gravity,
 		const double*  surf_tension,
-		const double*  accel_inertia);
+		const double*  accel_inertia,
+		const double   v_mesh[3]);

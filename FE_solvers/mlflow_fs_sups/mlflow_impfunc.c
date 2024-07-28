@@ -67,13 +67,39 @@ void BBFE_mlflow_renew_levelset(
 }
 
 void BBFE_mlflow_renew_acceleration(
-	double* accel, 
-	double* accel_amp,
-	double* accel_angle_vel,
-	double t)
+		double* accel, 
+		double* accel_amp,
+		double* accel_angle_vel,
+		double t)
 {
 	for(int i=0; i<3; i++){
 		//The inertial force due to acceleration is in the opposite direction, so it has a negative sign
 		accel[i] = - accel_amp[i] * accel_angle_vel[i] * accel_angle_vel[i] * sin(accel_angle_vel[i] * t);
+	}
+}
+
+void BBFE_mlflow_renew_mesh_velocity(
+		double** v_mesh,
+		double* accel_inertia,
+		const int total_num_nodes,
+		const double dt)
+{
+	for(int i=0; i<total_num_nodes; i++){
+		for(int d=0; d<3; d++){
+			v_mesh[i][d] += - accel_inertia[d] * dt;
+		}
+	}
+}
+
+void BBFE_mlflow_renew_mesh_position(
+		double** x,
+		double** v_mesh,
+		const int total_num_nodes,
+		const double dt)
+{
+	for(int i=0; i<total_num_nodes; i++){
+		for(int d=0; d<3; d++){
+			x[i][d] += v_mesh[i][d] * dt;
+		}
 	}
 }

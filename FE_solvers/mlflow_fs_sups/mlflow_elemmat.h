@@ -14,7 +14,8 @@ double BBFE_elemmat_mat_levelset(
 		const double N_j,
 		const double grad_N_i[3],
 		const double v[3],
-		const double tau);
+		const double tau,
+		const double v_mesh[3]);
 
 double BBFE_elemmat_vec_levelset(
 		double         vec[3],
@@ -28,7 +29,8 @@ double BBFE_elemmat_vec_levelset(
 		const double   viscosity,
 		const double   tau_supg_ml,
 		const double   tau_lsic,
-		const double   dt);
+		const double   dt,
+		const double   v_mesh[3]);
 
 void BBFE_elemmat_vec_surface_tension(
 		const double   N_i,

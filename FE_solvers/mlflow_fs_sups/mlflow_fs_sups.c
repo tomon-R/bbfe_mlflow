@@ -14,8 +14,6 @@ const char*     ID_FINISH_TIME  = "#finish_time";
 const double  DVAL_FINISH_TIME  = 1.0;
 const char* ID_OUTPUT_INTERVAL  = "#output_interval";
 const int DVAL_OUTPUT_INTERVAL  = 1;
-const char*     ID_OUTPUT_TYPE  = "#output_type";
-const int     DVAL_OUTPUT_TYPE  = 0;
 const char*       ID_DENSITY_L  = "#density_l";
 const double    DVAL_DENSITY_L  = 1000.0;
 const char*       ID_DENSITY_G  = "#density_g";
@@ -40,6 +38,10 @@ const char*    ID_EPSILON_REINIT = "#epsilon_reinit";
 const double DVAL_EPSILON_REINIT = 0.5;
 const char*      ID_DELTA_REINIT = "#delta_reinit";
 const double   DVAL_DELTA_REINIT = 1e-1;
+const char*    ID_OUTPUT_OPTION  = "#output_option";
+const int    DVAL_OUTPUT_OPTION  = 0;
+const char*       ID_ALE_OPTION  = "#ale_option";
+const int       DVAL_ALE_OPTION  = 0;
 
 const int BUFFER_SIZE = 10000;
 
@@ -49,6 +51,7 @@ static const char* INPUT_FILENAME_D_BC_P  = "D_bc_p.dat";
 static const char* INPUT_FILENAME_LEVELSET= "levelset.dat";
 
 static const char* OUTPUT_FILENAME_VTK    = "result_%d_%06d.vtk";
+static const char* OUTPUT_FILENAME_VOLUME   = "result_volume.csv";
 
 typedef struct
 {
@@ -59,7 +62,6 @@ typedef struct
 	double dt;
 	double finish_time;
 	int    output_interval;
-	int    output_type;
 
 	double density_l, density_g; 
 	double viscosity_l, viscosity_g;
@@ -67,6 +69,7 @@ typedef struct
 	double* accel_amp;
 	double* accel_angle_vel;
 	double* accel_inertia;
+	double** v_mesh;
 
 	double volume_g_init;
 	double volume_l_init;
@@ -88,6 +91,9 @@ typedef struct
 	double dt_reinit;
 	double epsilon_reinit;
 	double delta_reinit;
+
+	int output_option;
+	int ale_option;
 
 } VALUES;
 
@@ -131,6 +137,7 @@ void memory_allocation_nodal_values(
 	vals->heaviside  = BB_std_calloc_1d_double(vals->heaviside, total_num_nodes);
 	vals->surf_tension  = BB_std_calloc_2d_double(vals->surf_tension, total_num_nodes, 3);
 	vals->grad_phi  = BB_std_calloc_2d_double(vals->grad_phi, total_num_nodes, 3);
+	vals->v_mesh = BB_std_calloc_2d_double(vals->v, total_num_nodes, 3);
 }
 
 
@@ -144,7 +151,6 @@ void assign_default_values(
 	vals->dt               = DVAL_DT;
 	vals->finish_time      = DVAL_FINISH_TIME;
 	vals->output_interval  = DVAL_OUTPUT_INTERVAL;
-	vals->output_type      = DVAL_OUTPUT_TYPE;
 
 	vals->density_l        = DVAL_DENSITY_L;
 	vals->density_g        = DVAL_DENSITY_G;
@@ -176,6 +182,9 @@ void assign_default_values(
 	vals->dt_reinit = DVAL_DT_REINIT;
 	vals->epsilon_reinit = DVAL_EPSILON_REINIT;
 	vals->delta_reinit = DVAL_DELTA_REINIT;
+
+	vals->output_option    = DVAL_OUTPUT_OPTION;
+	vals->ale_option    = DVAL_ALE_OPTION;
 }
 
 
@@ -191,21 +200,23 @@ void print_all_values(
 	printf("%s %s: %e\n", CODENAME, ID_DT,               vals->dt);
 	printf("%s %s: %e\n", CODENAME, ID_FINISH_TIME,      vals->finish_time);
 	printf("%s %s: %d\n", CODENAME, ID_OUTPUT_INTERVAL,  vals->output_interval);
-	printf("%s %s: %d\n", CODENAME, ID_OUTPUT_TYPE,      vals->output_type);
 
-	printf("%s %s: %e\n", CODENAME, ID_DENSITY_L,          vals->density_l);
-	printf("%s %s: %e\n", CODENAME, ID_DENSITY_G,          vals->density_g);
-	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_L,        vals->viscosity_l);
-	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_G,        vals->viscosity_g);
-	printf("%s %s: %e %e %e\n", CODENAME, ID_GRAVITY, vals->gravity[0], vals->gravity[1], vals->gravity[2]);
-	printf("%s %s: %e %e %e\n", CODENAME, ID_ACCEL_AMP, vals->accel_amp[0], vals->accel_amp[1], vals->accel_amp[2]);
+	printf("%s %s: %e\n", CODENAME, ID_DENSITY_L,        vals->density_l);
+	printf("%s %s: %e\n", CODENAME, ID_DENSITY_G,        vals->density_g);
+	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_L,      vals->viscosity_l);
+	printf("%s %s: %e\n", CODENAME, ID_VISCOSITY_G,      vals->viscosity_g);
+
+	printf("%s %s: %e %e %e\n", CODENAME, ID_GRAVITY,    vals->gravity[0], vals->gravity[1], vals->gravity[2]);
+	printf("%s %s: %e %e %e\n", CODENAME, ID_ACCEL_AMP,  vals->accel_amp[0], vals->accel_amp[1], vals->accel_amp[2]);
 	printf("%s %s: %e %e %e\n", CODENAME, ID_ACCEL_ANGLE_VEL, vals->accel_angle_vel[0], vals->accel_angle_vel[1], vals->accel_angle_vel[2]);
-	printf("%s %s: %e\n", CODENAME, ID_SURF_TENSION_COEF, vals->surf_tension_coef);
-	printf("%s %s: %e\n", CODENAME, ID_SIZE_INTERFACE, vals->size_interface);
 
-	printf("%s %s: %e\n", CODENAME, ID_DT_REINIT, vals->dt_reinit);
-	printf("%s %s: %e\n", CODENAME, ID_EPSILON_REINIT, vals->epsilon_reinit);
-	printf("%s %s: %e\n", CODENAME, ID_DELTA_REINIT, vals->delta_reinit);
+	printf("%s %s: %e\n", CODENAME, ID_SURF_TENSION_COEF,vals->surf_tension_coef);
+	printf("%s %s: %e\n", CODENAME, ID_SIZE_INTERFACE,   vals->size_interface);
+	printf("%s %s: %e\n", CODENAME, ID_DT_REINIT,        vals->dt_reinit);
+	printf("%s %s: %e\n", CODENAME, ID_EPSILON_REINIT,   vals->epsilon_reinit);
+	printf("%s %s: %e\n", CODENAME, ID_DELTA_REINIT,     vals->delta_reinit);
+	printf("%s %s: %d\n", CODENAME, ID_OUTPUT_OPTION,    vals->output_option);
+	printf("%s %s: %d\n", CODENAME, ID_ALE_OPTION,       vals->ale_option);
 
 	printf("%s -------------------------------------------\n\n", CODENAME);
 }
@@ -243,9 +254,6 @@ void read_calc_conditions(
 				&(vals->finish_time), filename, ID_FINISH_TIME, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_int_p(
 				&(vals->output_interval), filename, ID_OUTPUT_INTERVAL, BUFFER_SIZE, CODENAME);
-		num = BB_std_read_file_get_val_int_p(
-				&(vals->output_type), filename, ID_OUTPUT_TYPE, BUFFER_SIZE, CODENAME);
-
 		num = BB_std_read_file_get_val_double_p(
 				&(vals->density_l), filename, ID_DENSITY_L, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
@@ -270,6 +278,10 @@ void read_calc_conditions(
 				&(vals->epsilon_reinit), filename, ID_EPSILON_REINIT, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
 				&(vals->delta_reinit), filename, ID_DELTA_REINIT, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_int_p(
+				&(vals->output_option), filename, ID_OUTPUT_OPTION, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_int_p(
+				&(vals->ale_option), filename, ID_ALE_OPTION, BUFFER_SIZE, CODENAME);
 		fclose(fp);
 	}
 
@@ -359,7 +371,7 @@ void output_files(
 	output_result_file_vtk(
 			&(sys->fe), &(sys->vals), fname_vtk, sys->cond.directory, t);
 
-	switch(sys->vals.output_type){
+	switch(sys->vals.output_option){
 		case 1:
 			output_result_dambreak_data(&(sys->fe), sys->vals.levelset, sys->cond.directory, t);
 			break;
@@ -434,9 +446,13 @@ void set_element_mat(
 
 	double** local_v;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-
 	double** v_ip; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
+
+	double** local_v_mesh;
+	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
+	double** v_mesh_ip; 
+	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
 
 	double* local_viscosity;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
@@ -456,12 +472,14 @@ void set_element_mat(
 		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_vector(local_v, fe, vals->v, e, 3);
+		BBFE_elemmat_set_local_array_vector(local_v_mesh, fe, vals->v_mesh, e, 3);
 
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
 
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
+			BBFE_std_mapping_vector3d(v_mesh_ip[p], nl, local_v_mesh, basis->N[p]);
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);		
 		}
@@ -475,7 +493,7 @@ void set_element_mat(
 					BBFE_elemmat_fluid_sups_mat(
 							A, basis->N[p][i], basis->N[p][j], 
 							fe->geo[e][p].grad_N[i], fe->geo[e][p].grad_N[j], 
-							v_ip[p], density_ip[p], viscosity_ip[p], tau, vals->dt);
+							v_ip[p], density_ip[p], viscosity_ip[p], tau, vals->dt, v_mesh_ip[p]);
 
 					for(int a=0; a<4; a++){
 						for(int b=0; b<4; b++) {
@@ -504,7 +522,9 @@ void set_element_mat(
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
 
-	// for multilayer flow
+	BB_std_free_2d_double(local_v_mesh, nl, 3);
+	BB_std_free_2d_double(v_mesh_ip, np, 3);
+
 	BB_std_free_1d_double(local_density, nl);
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(density_ip, np);
@@ -528,11 +548,15 @@ void set_element_vec(
 
 	double** local_v;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-
 	double** v_ip; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
 	double*** grad_v_ip;
 	grad_v_ip = BB_std_calloc_3d_double(grad_v_ip, np, 3, 3);
+
+	double** local_v_mesh;
+	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
+	double** v_mesh_ip; 
+	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
 
 	double* local_viscosity;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
@@ -564,6 +588,7 @@ void set_element_vec(
 		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_vector(local_v, fe, vals->v, e, 3);
+		BBFE_elemmat_set_local_array_vector(local_v_mesh, fe, vals->v_mesh, e, 3);
 
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
@@ -572,6 +597,7 @@ void set_element_vec(
 
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
+			BBFE_std_mapping_vector3d(v_mesh_ip[p], nl, local_v_mesh, basis->N[p]);
 			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
 			BBFE_std_mapping_vector3d_grad(grad_v_ip[p], nl, local_v, fe->geo[e][p].grad_N);
 
@@ -589,18 +615,18 @@ void set_element_vec(
 
 				BBFE_elemmat_vec_surface_tension(
 						basis->N[p][i], fe->geo[e][p].grad_N[i], levelset_ip[p], grad_phi_ip[p], 
-						vals->surf_tension_coef, surf_tension_ip[p], vals->epsilon_reinit);
+						vals->surf_tension_coef, surf_tension_ip[p], vals->size_interface);
 
 				double vec[4];
 				//*
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p], vals->accel_inertia);
+						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p], vals->accel_inertia, v_mesh_ip[p]);
 				//*/
 				/*
 				BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p], vals-accel_inertia);
+						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p], vals-accel_inertia, v_mesh_ip[p]);
 				//*/
 				for(int d=0; d<4; d++) {
 					val_ip[d][p] = vec[d];
@@ -629,7 +655,9 @@ void set_element_vec(
 	BB_std_free_2d_double(v_ip, np, 3);
 	BB_std_free_3d_double(grad_v_ip, np, 3, 3);
 
-	// for multilayer flow
+	BB_std_free_2d_double(local_v_mesh, nl, 3);
+	BB_std_free_2d_double(v_mesh_ip, np, 3);
+
 	BB_std_free_1d_double(local_density, nl);
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(density_ip, np);
@@ -662,9 +690,13 @@ void set_element_mat_levelset(
 
 	double** local_v;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-
 	double** v_ip; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
+
+	double** local_v_mesh;
+	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
+	double** v_mesh_ip; 
+	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
 
 	double* local_viscosity;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
@@ -682,12 +714,14 @@ void set_element_mat_levelset(
 		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_vector(local_v, fe, vals->v, e, 3);
+		BBFE_elemmat_set_local_array_vector(local_v_mesh, fe, vals->v_mesh, e, 3);
 
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
 
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
+			BBFE_std_mapping_vector3d(v_mesh_ip[p], nl, local_v_mesh, basis->N[p]);
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
 		}
@@ -701,7 +735,7 @@ void set_element_mat_levelset(
 					double tau = elemmat_supg_coef_ml(v_ip[p], h_e, vals->dt);
 
 					val_ip[p] = BBFE_elemmat_mat_levelset(
-							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau);
+							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau, v_mesh_ip[p]);
 				}
 
 				double integ_val = BBFE_std_integ_calc(
@@ -718,7 +752,9 @@ void set_element_mat_levelset(
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
 
-	// for multilayer flow
+	BB_std_free_2d_double(local_v_mesh, nl, 3);
+	BB_std_free_2d_double(v_mesh_ip, np, 3);
+
 	BB_std_free_1d_double(local_density, nl);
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(density_ip, np);
@@ -741,10 +777,14 @@ void set_element_vec_levelset(
 
 	double** local_v;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-
 	double** v_ip; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
-	// for multilayer flow
+
+	double** local_v_mesh;
+	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
+	double** v_mesh_ip; 
+	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
+
 	double* local_levelset;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
 	double* local_viscosity;
@@ -771,7 +811,8 @@ void set_element_vec_levelset(
 		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_vector(local_v, fe, vals->v, e, 3);
-		// for multilayer flow
+		BBFE_elemmat_set_local_array_vector(local_v_mesh, fe, vals->v_mesh, e, 3);
+		
 		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
@@ -779,8 +820,10 @@ void set_element_vec_levelset(
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
 			BBFE_std_mapping_vector3d_grad(grad_v_ip[p], nl, local_v, fe->geo[e][p].grad_N);
+
+			BBFE_std_mapping_vector3d(v_mesh_ip[p], nl, local_v_mesh, basis->N[p]);
+
 			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
-			// for multilayer flow
 			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p]   = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
@@ -797,7 +840,8 @@ void set_element_vec_levelset(
 					basis->N[p][i], fe->geo[e][p].grad_N[i], 
 					v_ip[p], grad_v_ip[p],
 					levelset_ip[p], grad_phi_ip[p],
-					density_ip[p], viscosity_ip[p], tau_supg_ml, tau_lsic, vals->dt);
+					density_ip[p], viscosity_ip[p], tau_supg_ml, tau_lsic, vals->dt,
+					v_mesh_ip[p]);
 			}
 			double integ_val = BBFE_std_integ_calc(
 					np, val_ip, basis->integ_weight, Jacobian_ip);
@@ -811,7 +855,10 @@ void set_element_vec_levelset(
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
 	BB_std_free_3d_double(grad_v_ip, np, 3, 3);
-	// for multilayer flow
+
+	BB_std_free_2d_double(local_v_mesh, nl, 3);
+	BB_std_free_2d_double(v_mesh_ip, np, 3);
+
 	BB_std_free_1d_double(local_density, nl);
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(local_levelset, nl);
@@ -1251,6 +1298,7 @@ void BBFE_mlflow_volume_correction(
 		BBFE_BASIS*  basis,
 		VALUES*      vals,
 		MONOLIS_COM* monolis_com,
+		CONDITIONS*  cond,
 		int          step)
 {
 	// calculate volume of gas
@@ -1336,7 +1384,20 @@ void BBFE_mlflow_volume_correction(
 			vals->levelset[i] += L_error;
 		}
 	}
-	
+
+	// file output
+	char filename[BUFFER_SIZE];
+	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_VOLUME);
+	FILE* fp;
+	fp = BBFE_sys_write_add_fopen(fp, filename, cond->directory);
+	double eps = 1e-10;
+	if(step == 0){
+		fprintf(fp, "%s, %s, %s, %s\n", "Time", "V_g(t)", "V_g(0)", "V_g(t)/V_g(0)");
+	}else if(step%vals->output_interval == 0){
+		fprintf(fp, "%lf, %lf, %lf, %lf\n", step*vals->dt, vol_gas, vals->volume_g_init, vol_gas/vals->volume_g_init*100);
+	}
+	fclose(fp);
+
 	BB_std_free_1d_double(vol_g_ip,      np);
 	BB_std_free_1d_double(vol_i_ip,      np);
 	BB_std_free_1d_double(Jacobian_ip, np);
@@ -1400,8 +1461,8 @@ int main(
 	int step = 0;
 	int file_num = 0;
 	output_files(&sys, file_num, t);
-	// calculate initial volume of gas
-	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), step);
+	// Calculate initial volume of gas
+	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), &(sys.cond), step);
 
 	while (t < sys.vals.finish_time) {
 		t += sys.vals.dt;
@@ -1416,15 +1477,20 @@ int main(
 
 		monolis_clear_mat_value_rhs_R(&(sys.mono_L2));
 
-		// clear surface tension vector
+		// Clear surface tension vector
 		for(int m=0;m<sys.fe.total_num_nodes;m++){
 			sys.vals.surf_tension[m][0] = 0;
 			sys.vals.surf_tension[m][1] = 0;
 			sys.vals.surf_tension[m][2] = 0;
 		}
 
-		// update inertial acceleration
+		// Update inertial acceleration
 		BBFE_mlflow_renew_acceleration(sys.vals.accel_inertia, sys.vals.accel_amp, sys.vals.accel_angle_vel, t);
+
+		if(sys.vals.ale_option == 1){
+			// Update mesh velosity
+			BBFE_mlflow_renew_mesh_velocity(sys.vals.v_mesh, sys.vals.accel_inertia, sys.fe.total_num_nodes, sys.vals.dt);
+		}
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
 		BBFE_mlflow_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
@@ -1538,11 +1604,15 @@ int main(
 		reinit_levelset(&(sys));
 		//reinit_CLSM(&(sys));
 
-		//printf("%s --- Volume correction step ---\n", CODENAME);
-		BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), step);
+		printf("%s --- Volume correction step ---\n", CODENAME);
+		BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), &(sys.cond), step);
 
-		/**********************************************/
+		if(sys.vals.ale_option == 1){
+			// Update mesh position with mesh velocity
+			BBFE_mlflow_renew_mesh_position(sys.fe.x, sys.vals.v_mesh, sys.fe.total_num_nodes, sys.vals.dt);
+		}
 
+		/*********** Output result files for each intervals ***********/
 		if(step%sys.vals.output_interval == 0) {
 
 			BBFE_fluid_sups_renew_pressure(
