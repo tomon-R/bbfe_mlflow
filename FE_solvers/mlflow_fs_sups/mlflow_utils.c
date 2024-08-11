@@ -6,6 +6,7 @@ static const char* OUTPUT_FILENAME_BUBBLE   = "result_bubble.csv";
 static const char* OUTPUT_FILENAME_SLOSHING = "result_sloshing.csv";
 
 const int BUFFER_SIZE = 10000;
+const double EPS = 1.0e-10;
 
 /**********************************************************
  * Output Dambreak Data
@@ -39,14 +40,13 @@ void output_result_dambreak_data(
 
 	int cnt_bottom = 0;
 	int cnt_height = 0;
-	const double eps  = 1.0e-10;
 
 	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][2] - 0.0) < eps && abs(fe->x[i][1] - 0.0) < eps){
+		if(abs(fe->x[i][2] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
 			// (y,z)=(0,0)
 			cnt_bottom++;
 		}
-		if(abs(fe->x[i][0] - 0.0) < eps && abs(fe->x[i][1] - 0.0) < eps){
+		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
 			// (x,y)=(0,0)
 			cnt_height++;
 		}
@@ -59,14 +59,14 @@ void output_result_dambreak_data(
 	Pair *pairs_x = (Pair*)malloc(cnt_bottom * sizeof(Pair));
 	Pair *pairs_z = (Pair*)malloc(cnt_height * sizeof(Pair));
     if (pairs_x == NULL || pairs_z == NULL) {
-        fprintf(stderr, "メモリ割り当てエラー\n");
+        fprintf(stderr, "Error of memory allocation\n");
         exit(1);
     }
 	int id_x = 0;
 	int id_z = 0;
 
 	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][2] - 0.0) < eps && abs(fe->x[i][1] - 0.0) < eps){
+		if(abs(fe->x[i][2] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
 			// (y,z)=(0,0)
 			x[id_x] = fe->x[i][0];
 			phi_x[id_x] = levelset[i];
@@ -74,7 +74,7 @@ void output_result_dambreak_data(
 			pairs_x[id_x].value = phi_x[id_x];
 			id_x++;
 		}
-		if(abs(fe->x[i][0] - 0.0) < eps && abs(fe->x[i][1] - 0.0) < eps){
+		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
 			// (x,y)=(0,0)
 			z[id_z] = fe->x[i][2];
 			phi_z[id_z] = levelset[i];
@@ -87,7 +87,7 @@ void output_result_dambreak_data(
 	qsort(pairs_x, cnt_bottom, sizeof(Pair), compare);
 	qsort(pairs_z, cnt_height, sizeof(Pair), compare);
 
-	if(abs(time-0.0)<eps){
+	if(abs(time-0.0)<EPS){
 		fprintf(fp, "%s, %s, %s, \n", "Time", "x", "z");
 	}
 	fprintf(fp, "%lf, ", time);
@@ -104,7 +104,7 @@ void output_result_dambreak_data(
 			//fprintf(fp, "%lf, %lf\n", x1, p1);
 			fprintf(fp, "%lf, ", x_zero);
 			//fprintf(fp, "%lf, %lf\n", x2, p2);
-		}else if(abs(pairs_x[i].value)<eps){
+		}else if(abs(pairs_x[i].value)<EPS){
 			fprintf(fp, "%lf, ", pairs_x[i].key);
 		}
 	}
@@ -121,7 +121,7 @@ void output_result_dambreak_data(
 			//fprintf(fp, "%lf, %lf\n", z1, p1);
 			fprintf(fp, "%lf\n", z_zero);
 			//fprintf(fp, "%lf, %lf\n", z2, p2);
-		}else if(abs(pairs_z[i].value)<eps){
+		}else if(abs(pairs_z[i].value)<EPS){
 			fprintf(fp, "%lf\n", pairs_z[i].key);
 		}
 	}
@@ -249,8 +249,7 @@ void output_result_bubble_data(
 
 	calc_data_bubble(fe, basis, v, heaviside, data);
 
-	double eps = 1e-10;
-	if(abs(time-0.0)<eps){
+	if(abs(time-0.0)<EPS){
 		fprintf(fp, "%s, %s, %s, %s, %s\n", "Time", "z", "vz", "sphericity", "size");
 	}
 	fprintf(fp, "%lf, %lf, %lf, %lf, %lf\n", time, data[0], data[1], data[2], data[3]);
@@ -264,10 +263,39 @@ void output_result_bubble_data(
 /**********************************************************
  * Output Sloshing Data
  **********************************************************/
+int count_mlflow_measurement_node(
+		BBFE_DATA* fe)
+{
+	int num_nodes = 0;
+	for(int i=0; i<fe->total_num_nodes; i++){
+		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+			// (x,y)=(0,0)
+			num_nodes += 1;
+		}
+	}
+	return num_nodes;
+}
+
+void set_mlflow_measurement_node(
+		BBFE_DATA* fe,
+		int* measurement_node_id)
+{
+    int mnid = 0;
+	for(int i=0; i<fe->total_num_nodes; i++){
+		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+			// (x,y)=(0,0)
+			measurement_node_id[mnid] = i;
+			mnid += 1;
+		}
+	}
+}
+
 void output_result_sloshing_data(
 		BBFE_DATA* fe,
 		double* levelset,
 		const char* directory,
+		int* measurement_node_id,
+		int  num_nodes,
 		double time)
 {
 	char filename[BUFFER_SIZE];
@@ -276,43 +304,30 @@ void output_result_sloshing_data(
 	FILE* fp;
 	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
 
-	int cnt_height = 0;
-	const double eps  = 1.0e-10;
-
-	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][0] - 0.0) < eps && abs(fe->x[i][1] - 0.0) < eps){
-			// (x,y)=(0,0)
-			cnt_height++;
-		}
-	}
-
-	double* z = BB_std_calloc_1d_double(z, cnt_height);
-	double* phi_z = BB_std_calloc_1d_double(phi_z, cnt_height);
-	Pair *pairs_z = (Pair*)malloc(cnt_height * sizeof(Pair));
+	double* z     = BB_std_calloc_1d_double(z, num_nodes);
+	double* phi_z = BB_std_calloc_1d_double(phi_z, num_nodes);
+	Pair *pairs_z = (Pair*)malloc(num_nodes * sizeof(Pair));
     if (pairs_z == NULL) {
-        fprintf(stderr, "メモリ割り当てエラー\n");
+        fprintf(stderr, "Error of memory allocation\n");
         exit(1);
     }
-	int id_z = 0;
-
-	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][0] - 0.0) < eps && abs(fe->x[i][1] - 0.0) < eps){
-			// (x,y)=(0,0)
-			z[id_z] = fe->x[i][2];
-			phi_z[id_z] = levelset[i];
-			pairs_z[id_z].key = z[id_z];
-			pairs_z[id_z].value = phi_z[id_z];
-			id_z++;
-		}
+	for(int i=0; i<num_nodes; i++){
+		int mnid = measurement_node_id[i];
+		//printf("i, mnid: %d %d\n", i, mnid);
+		// (x,y)=(0,0)
+		z[i] = fe->x[mnid][2];
+		phi_z[i] = levelset[mnid];
+		pairs_z[i].key = z[i];
+		pairs_z[i].value = phi_z[i];
 	}
 
-	qsort(pairs_z, cnt_height, sizeof(Pair), compare);
+	qsort(pairs_z, num_nodes, sizeof(Pair), compare);
 
-	if(abs(time-0.0)<eps){
+	if(abs(time-0.0)<EPS){
 		fprintf(fp, "%s, %s, \n", "Time", "z");
 	}
-	fprintf(fp, "%lf, ", time);
-	for(int i=0; i<cnt_height; i++){
+	
+	for(int i=0; i<num_nodes-1;i++){
 		if(pairs_z[i].value>0 && pairs_z[i+1].value<0){
 			double z1 = pairs_z[i].key;
 			double z2 = pairs_z[i+1].key;
@@ -321,17 +336,17 @@ void output_result_sloshing_data(
 
 			double z_zero = (p1*z2 - p2*z1)/(p1 - p2);
 			
+			fprintf(fp, "%lf, ", time);
 			//fprintf(fp, "%lf, %lf\n", z1, p1);
 			fprintf(fp, "%lf\n", z_zero);
 			//fprintf(fp, "%lf, %lf\n", z2, p2);
-		}else if(abs(pairs_z[i].value)<eps){
+		}else if(abs(pairs_z[i].value)<EPS){
 			fprintf(fp, "%lf\n", pairs_z[i].key);
 		}
 	}
-	BB_std_free_1d_double(z, cnt_height);
-	BB_std_free_1d_double(phi_z, cnt_height);
+	BB_std_free_1d_double(z, num_nodes);
+	BB_std_free_1d_double(phi_z, num_nodes);
 	free(pairs_z);
 
 	fclose(fp);
-
 }
