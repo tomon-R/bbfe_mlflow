@@ -145,7 +145,8 @@ void BBFE_elemmat_fluid_sups_vec(
 		const double*  gravity,
 		const double*  surf_tension,
 		const double*  accel_inertia,
-		const double   v_mesh[3]
+		const double   v_mesh[3],
+		const int      ale_option
 		)
 {
 	double*  v_ale;
@@ -162,9 +163,14 @@ void BBFE_elemmat_fluid_sups_vec(
 		val += density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * v[d];
 
 		/* external force */
-		val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
+		if(ale_option == 1){
+			val += density * N_i * gravity[d] * dt;
+			val += (density * N_i * gravity[d] * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
+		}else{
+			val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
+			val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
+		}
 		val += surf_tension[d] * dt;
-		val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
 
 		vec[d] = val;
 	}
@@ -272,7 +278,8 @@ void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 		const double*  gravity,
 		const double*  surf_tension,
 		const double*  accel_inertia,
-		const double   v_mesh[3])
+		const double   v_mesh[3],
+		const int      ale_option)
 {
 	double*  v_ale;
 	v_ale = BB_std_calloc_1d_double(v_ale, 3);
@@ -310,9 +317,14 @@ void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 			val += - density * dt * 0.5 * (D_31 + D_32 + D_33);
 		}
 		/* external force */
-		val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
+		if(ale_option == 1){
+			val += density * N_i * gravity[d] * dt;
+			val += (density * N_i * gravity[d] * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
+		}else{
+			val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
+			val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
+		}
 		val += surf_tension[d] * dt;
-		val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
 
 		vec[d] = val;
 	}
