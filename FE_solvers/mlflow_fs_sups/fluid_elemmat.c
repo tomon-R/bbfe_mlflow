@@ -51,6 +51,27 @@ double BBFE_elemmat_fluid_sups_coef(
 	return (val);
 }
 
+/**********************************************************
+ * Shock capturing
+ **********************************************************/
+double BBFE_elemmat_mlflow_shock_capturing_coef(
+		const double density,
+		const double viscosity,
+		const double v[3],
+		const double h_e)
+{
+	double l_v = BB_calc_vec3d_length(v);
+	double nu = viscosity / density;
+	double re = l_v * h_e / (2 * nu);
+	double xi = re/3;
+	if(xi>1){
+		xi = 1;
+	}
+	
+	double val = h_e / 2 * l_v * xi;
+	return (val);
+}
+
 void BBFE_elemmat_fluid_sups_mat(
 		double         mat[4][4],
 		const double   N_i,
@@ -61,6 +82,7 @@ void BBFE_elemmat_fluid_sups_mat(
 		const double   density,
 		const double   viscosity,
 		const double   tau,
+		const double   tau_c,
 		const double   dt,
 		const double   v_mesh[3])
 {
@@ -113,17 +135,22 @@ void BBFE_elemmat_fluid_sups_mat(
 			grad_N_i[1] * grad_N_j[1] +
 			grad_N_i[2] * grad_N_j[2]) / density;
 
-	mat[0][0] = M + M_s + A + A_s + D_11;
+	//Shock Capturing項
+	double C_s1 = dt * density * tau_c * grad_N_i[0] * grad_N_j[0];
+	double C_s2 = dt * density * tau_c * grad_N_i[1] * grad_N_j[1];
+	double C_s3 = dt * density * tau_c * grad_N_i[2] * grad_N_j[2];
+
+	mat[0][0] = M + M_s + A + A_s + D_11 + C_s1;
 	mat[0][1] = D_12;
 	mat[0][2] = D_13;
 	mat[0][3] = G1 + G_s1;
 	mat[1][0] = D_21;
-	mat[1][1] = M + M_s + A + A_s + D_22;
+	mat[1][1] = M + M_s + A + A_s + D_22 + C_s2;
 	mat[1][2] = D_23;
 	mat[1][3] = G2 + G_s2;
 	mat[2][0] = D_31;
 	mat[2][1] = D_32;
-	mat[2][2] = M + M_s + A + A_s + D_33;
+	mat[2][2] = M + M_s + A + A_s + D_33 + C_s3;
 	mat[2][3] = G3 + G_s3;
 	mat[3][0] = C1 + M_p1 + A_p1;
 	mat[3][1] = C2 + M_p2 + A_p2;
@@ -181,7 +208,8 @@ void BBFE_elemmat_fluid_sups_vec(
 }
 
 /**********************************************************
- * Crank-Nicolson version
+ * A formulation where the Crank-Nicolson method is applied for time discretization 
+ *   and the second-order Adams-Bashforth method is applied for linearization with respect to the advection velocity
  **********************************************************/
 void BBFE_elemmat_fluid_sups_mat_crank_nicolson(
 		double         mat[4][4],
@@ -245,17 +273,22 @@ void BBFE_elemmat_fluid_sups_mat_crank_nicolson(
 			grad_N_i[1] * grad_N_j[1] +
 			grad_N_i[2] * grad_N_j[2]) / density;
 
-	mat[0][0] = M + M_s + (A + A_s + D_11) * 0.5;
+	//Shock Capturing項
+	double C_s1 = dt * density * tau_c * grad_N_i[0] * grad_N_j[0];
+	double C_s2 = dt * density * tau_c * grad_N_i[1] * grad_N_j[1];
+	double C_s3 = dt * density * tau_c * grad_N_i[2] * grad_N_j[2];
+
+	mat[0][0] = M + M_s + (A + A_s + D_11) * 0.5 + C_s1;
 	mat[0][1] = D_12 * 0.5;
 	mat[0][2] = D_13 * 0.5;
 	mat[0][3] = G1 + G_s1;
 	mat[1][0] = D_21 * 0.5;
-	mat[1][1] = M + M_s + (A + A_s + D_22) * 0.5;
+	mat[1][1] = M + M_s + (A + A_s + D_22) * 0.5 + C_s2;
 	mat[1][2] = D_23 * 0.5;
 	mat[1][3] = G2 + G_s2;
 	mat[2][0] = D_31 * 0.5;
 	mat[2][1] = D_32 * 0.5;
-	mat[2][2] = M + M_s + (A + A_s + D_33) * 0.5;
+	mat[2][2] = M + M_s + (A + A_s + D_33) * 0.5 + C_s3;
 	mat[2][3] = G3 + G_s3;
 	mat[3][0] = C1 + M_p1 + A_p1 * 0.5;
 	mat[3][1] = C2 + M_p2 + A_p2 * 0.5;

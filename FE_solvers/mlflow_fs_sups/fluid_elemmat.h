@@ -21,6 +21,15 @@ double BBFE_elemmat_fluid_sups_coef(
 		const double h_e,
 		const double dt);
 
+/**********************************************************
+ * Shock capturing stabilization parameter
+ **********************************************************/
+double BBFE_elemmat_mlflow_shock_capturing_coef(
+		const double density,
+		const double viscosity,
+		const double v[3],
+		const double h_e);
+
 void BBFE_elemmat_fluid_sups_mat(
 		double         mat[4][4],
 		const double   N_i,
@@ -31,6 +40,7 @@ void BBFE_elemmat_fluid_sups_mat(
 		const double   density,
 		const double   viscosity,
 		const double   tau,
+		const double   tau_c,
 		const double   dt,
 		const double   v_mesh[3]);
 
