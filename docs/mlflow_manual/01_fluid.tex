@@ -15,68 +15,20 @@
 
 流体は非圧縮性粘性を仮定しているため、Navier-Stokes方程式(\ref{fluid-ns})と非圧縮性の連続の式(\ref{fluid-continuum})を解く。
 
-\subsection{Fractional step法}
-流体解析プログラムでは、流体を解く手法として分離型解法の一つであるFractional Step法を使用する。
-Navier-Stokes方程式(\ref{fluid-ns})において、外力項を省略し、両辺を流体の密度$\rho$で割って無次元化したNavier-Stokes方程式は以下の式(\ref{fs-ns})のように記述される。ここではEinsteinの縮約記法を用いる。
-\begin{equation}
-\label{fs-ns}
-	\frac{u^{n+1}_i - u^{n}_i}{\Delta t} + u^{n}_i \frac{\partial u^{n}_i}{\partial x_j}
-	+ \frac{\partial p^{n+1}}{\partial x_i} - \frac{1}{\mathrm{Re}} \frac{\partial^{2} u^{n}_i}{\partial x^{2}_j} = 0
-\end{equation}
-ここで$u^{n}_{i}$は$n$ステップ目における$i$方向の流速、$\mathrm{Re}$はレイノルズ数を表す。
+\subsection{直接法による定式化}
 
-また、$n+1$ステップ目を満たす連続の式は以下の式(\ref{fs-continuum})ように記述される。
+\subsection{安定化有限要素法による離散化}
+同次補間要素の使用を可能にするGLS法をにより離散化すると式(\ref{fluid-GLS})となる。
 \begin{equation}
-\label{fs-continuum}
-	\frac{\partial u_{i}^{n+1}}{\partial x_{i}}=0
+\label{fluid-GLS}
+	\begin{aligned} 
+		\int_{\Omega} w_i^h & \left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}\right) d \Omega+\int_{\Omega} \frac{\partial w_i^h}{\partial x_j}\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) d \Omega+\int_{\Omega} q^h \frac{\partial u_i^h}{\partial x_i} d \Omega \\ & 
+		+\sum_{e=1}^M \int_{\Omega_e} \tau_m^e\left(\frac{\partial w_i^h}{\partial t}+u_j^h \frac{\partial w_i^h}{\partial x_j}+\frac{\partial q^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 w_i^h}{\partial x_j^2}\right)\left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}+\frac{\partial p^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 u_i^h}{\partial x_j^2}\right) d \Omega \\ & 
+		+\sum_{e=1}^M \int_{\Omega_e} \tau_c^e\left(\frac{\partial w_i^h}{\partial x_i} \frac{\partial u_j^h}{\partial x_j}\right) d \Omega=\int_{\Gamma_h} w_i^h\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) n_j d \Gamma
+	\end{aligned}
 \end{equation}
 
-式(\ref{fs-continuum})の発散を取り、式(\ref{fs-ns})に代入すると以下の圧力Poisson方程式(\ref{fs-poisson})が導かれる。
-\begin{equation}
-\label{fs-poisson}
-	\frac{\partial^2 p^{n+1}}{\partial x^{2}_i} = \frac{1}{\Delta t} \frac{\partial \tilde{u}_i}{\partial x_{i}}
-\end{equation}
-
-ここで$\tilde{u}_{i}$は中間流速であり、以下の式(\ref{fs-midvel})で記述される。
-\begin{equation}
-\label{fs-midvel}
-	\tilde{u}_{i} = u_{i}^{n} - \Delta t
-	\left(u_{j}^{n} \frac{\partial u_{i}^{n}}{\partial x_{j}} 
-	- \frac{1}{\mathrm{Re}} \frac{\partial^{2} u_{i}^{n}}{\partial x_{j}^{2}}\right)
-\end{equation}
-
-圧力Poisson方程式(\ref{fs-poisson})を解いて求めた$n+1$ステップ目の圧力$p^{n+1}$を使って速度を修正することで$n+1$ステップ目の流速$u^{n+1}_{i}$を次式(\ref{fs-correct})により求める。
-\begin{equation}
-\label{fs-correct}
-	u^{n+1}_i=\tilde{u}_i - \Delta t \frac{\partial p^{n+1}}{\partial x_i}
-\end{equation}
-
-\subsection{SUPG法による安定化有限要素法の定式化}
-Navier-Stokes方程式を数値的に解く時、移流項が卓越する場合には数値的な不安定性が生じるという問題がある。
-有限要素法において、移流項による数値不安定性を防ぐ方法として、SUPG(Streamline Upwind/Petrov-Galerkin)法が提案された。SUPG法は、移流項の重みを変化させることで、流れの流線方向にのみ安定化させることができる手法である。
-
-Fractional Step法を用いて定式化した式(\ref{fs-midvel})・(\ref{fs-poisson})・(\ref{fs-correct})にSUPG法を適用する。
-Galerkin法に基づいて、流速の重み関数$w_{i}$、流速$u_{i}$、中間流速$\tilde{u}_{i}$、圧力の重み関数$q$、圧力$p$を次の式(\ref{supg-fs})ように近似する。
-\begin{equation}
-\label{supg-fs}
-	\begin{split}
-		w_{i}^{h}=&N_{\alpha}^{e} w_{i\alpha}^{e},\; u_{i}^{h}=N_{\alpha}^{e} u_{i\alpha}^{e},\; 
-		\tilde{u}_{i}^{h}=N_{\alpha}^{e} \tilde{u}_{i\alpha}^{e}, \\
-		q^{h}=&L_{\alpha}^{e} q_{\alpha}^{e}, \; p^{h}=L_{\alpha}^{e} p_{\alpha}^{e} \\
-	\end{split}
-\end{equation}
-ここで$u_{i\alpha}^{e}$、$\tilde{u}_{i\alpha}^{e}$、$p_{\alpha}$はそれぞれ流速、中間流速、圧力の節点値である。また、$N_{\alpha}$、$L_{\alpha}$はそれぞれ流速場と圧力場に対する形状関数である。$e$は要素のインデックスを表す。
-
-中間流速を求める式は以下の式(\ref{supg-midvel})の通り。
-\begin{equation}
-\label{supg-midvel}
-	\begin{split}
-		\int_{\Omega} w_{i}\left( \frac{\tilde{u}-u^{n}_i}{\Delta t} + u^{n}_{j} \frac{\partial u^{n}_{i}}{\partial x_{j}}\right) \; d\Omega \;+ 
-		\int_{\Omega} \frac{1}{\mathrm{Re}} \frac{\partial w_{i}}{\partial x_{j}} \frac{\partial u^{n}_{i}}{\partial x_{j}} \; d\Omega \;+& \\
-		\sum_{e=1}^{M} \int_{\Omega_{e}} \tau_{m} u_{j}^{n} \frac{\partial w_{i}^{h}}{\partial x_{j}} \left( \frac{\tilde{u_{i}} - u_{i}^{n}}{\Delta t} + u_{j}^{n} \frac{\partial u_{i}^{n}}{\partial x_{j}} - \frac{1}{Re} \frac{\partial^{2} u_{i}^{n}}{\partial x_{j}^{2}}\right) \; d\Omega \;=& 
-		\int_{\Gamma_{h}} w_{i}\frac{1}{\mathrm{Re}} \frac{\partial u_{i}}{\partial x_{j}}n_{j} \;d\Gamma
-	\end{split}
-\end{equation}
+安定化パラメータは以下の通り。
 
 ここで$e$は要素のインデックス、$M$は全要素数、$\Omega_{e}$は要素領域、$\tau_{m}$は安定化パラメータであり、要素での安定化パラメータ$\tau_{m}^{e}$は次式(\ref{supg-tau})で与えられる。
 \begin{equation}
@@ -85,32 +37,161 @@ Galerkin法に基づいて、流速の重み関数$w_{i}$、流速$u_{i}$、中�
 \end{equation}
 $\Delta t$は時間刻み幅、$\bm{u}$は流速、$h_e$は要素サイズ、$\mathrm{Re_u}$は要素レイノルズ数である。
 
-圧力ポアソン方程式は以下の式(\ref{supg-poisson})のようになる。
+$\tau_{c}$は衝撃捕捉項の安定化パラメータであり、境界層内での解を安定化させる。
 \begin{equation}
-\label{supg-poisson}
-	\int_{\Omega} q \frac{\partial^{2}p^{n+1}}{\partial x_{i}^{2}} \; d\Omega = 
-	\frac{1}{\Delta t} \int_{\Omega} q \frac{\partial \tilde{u}_{i}}{\partial x_{i}} \; d\Omega
+	\begin{aligned} \tau_c & =\frac{h_e}{2}\left\|u_i^h\right\| z\left(R e_u\right) \\ z\left(R e_u\right) & = \begin{cases}R e_u / 3 & \left(0 \leq R e_u \leq 3\right) \\ 1 & \left(3 \leq R e_u\right)\end{cases} \end{aligned}
 \end{equation}
 
-速度の修正の式は以下の式(\ref{supg-correct})のようになる。
+非線形常微分方程式は式(\ref{fluid-GLS-matrix1}), (\ref{fluid-GLS-matrix2})となる。
 \begin{equation}
-\label{supg-correct}
-	\int_{\Omega} w_{i}u_{i}^{n+1} \; d\Omega = \int_{\Omega} w_{i} \tilde{u}_{i} \; d\Omega
-	- \Delta t \int_{\Omega} w_{i} \frac{\partial p^{n+1}}{\partial x_{i}} d\Omega
-\end{equation}
-
-式(\ref{supg-midvel})・(\ref{supg-poisson})・(\ref{supg-correct})を行列で表すとそれぞれ式(\ref{matrix-midvel})・(\ref{matrix-poisson})・(\ref{matrix-correct})になる。ただし、式(\ref{supg-poisson})に対しては部分積分を行う。
-\begin{equation}
-\label{matrix-midvel}
-	( \bm{M} + \bm{M}_{s} ) \frac{\tilde{\bm{u}}_i - \bm{u}_{i}^{n}}{\Delta t} + ( \bm{A} + \bm{A}_s ) \bm{u}_{i}^{n} + \bm{D} \bm{u}_{i}^{n} = 0
+\label{fluid-GLS-matrix1}
+	\left(\bm{M}+\bm{M}_S\right) \frac{d \bm{u}_i}{d t} 
+	+ \left(\bm{A}\left(\bm{u}_j\right)+\bm{A}_S\left(\bm{u}_j\right)\right) \bm{u}_i
+	- \left(\bm{G}_i-\bm{G}_{S i}\right) \bm{p}
+	+ \bm{D}_{i j} \bm{u}_j=\bm{F}_i
 \end{equation}
 
 \begin{equation}
-\label{matrix-poisson}
-	-\bm{G} \bm{p}^{n+1} = \frac{1}{\Delta t} \bm{C} \tilde{\bm{u}}_{i} - \bm{G}_{\Gamma}
+\label{fluid-GLS-matrix2}
+	\bm{C}_j \bm{u}_j+\bm{M}_{P j} \frac{d \bm{u}_j}{d t}
+	+ \bm{A}_{P j}\left(\bm{u}_k\right) \bm{u}_j
+	- \bm{G}_P \bm{p}=\mathbf{0}
+\end{equation}
+
+\subsection{離散化(Crank-Nicolson法とAdams-Bashforth法)}
+時間方向にCrank-Nicolson法を適用し、移流速度に対して2次精度Adams-Bashforth法を用いて線形化をすると、以下の式(\ref{fluid-matrix-CN1})が得られる。
+\begin{equation}
+\label{fluid-matrix-CN1}
+		\left\{M+M_S\right\} \frac{u_i^{n+1}-u_i^n}{\Delta t}+\left\{\bm{A}+\bm{A}_S\right\} u_i^{n+1 / 2}-\left\{\bm{G}_i-\bm{G}_{S i}\right\} \bm{p}^{n+1}+\bm{D}_{i j} \bm{u}_j^{n+1 / 2}=0
 \end{equation}
 
 \begin{equation}
-\label{matrix-correct}
-	\bm{M} \bm{u}_{i}^{n+1} = \bm{M} \tilde{\bm{u}}_{i} - \Delta t \bm{C} \bm{p}^{n+1}
+\label{fluid-matrix-CN2}
+		C_j u_j^{n+1}+M_{P j} \frac{u_j^{n+1}-\bm{u}_j^n}{\Delta t}+\bm{A}_{P j} \bm{u}_j^{n+1 / 2}+\bm{G}_P \bm{p}^{n+1}=0
+\end{equation}
+
+マトリックス表記すると以下のようになる。
+\begin{equation}
+	\left[\begin{array}{llll}
+		A_{11} & A_{12} & A_{13} & A_{14}\\ 
+		A_{21} & A_{22} & A_{23} & A_{24}\\ 
+		A_{31} & A_{32} & A_{33} & A_{34}\\
+		A_{41} & A_{42} & A_{43} & A_{44}
+	\end{array}
+	\right]\left
+	[
+	\begin{array}{l}
+		U^{n+1} \\ 
+		V^{n+1} \\
+		W^{n+1} \\
+		P^{n+1}
+	\end{array}
+	\right]
+	=\left[
+	\begin{array}{l}
+		b_1 \\ 
+		b_2 \\ 
+		b_3 \\
+		b_4
+	\end{array}
+	\right]
+\end{equation}
+
+マトリックスと右辺ベクトルの成分は以下のようになる。
+\begin{equation}
+	\begin{gathered}
+		\begin{aligned} 
+			&A_{11} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{11}\right) \\ 
+			&A_{12} = \frac{1}{2} \bm{D}_{12} \\ 
+			&A_{13} = \frac{1}{2} \bm{D}_{13} \\
+			&A_{14} = -\left(\bm{G}_1-\bm{G}_{S 1}\right) \\
+			&A_{21} = \frac{1}{2} \bm{D}_{21} \\ 
+			&A_{22} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{22}\right) \\
+			&A_{23} = \frac{1}{2} \bm{D}_{23} \\ 
+			&A_{24} = -\left(\bm{G}_2-\bm{G}_{S 2}\right) \\
+			&A_{31} = \frac{1}{2} \bm{D}_{31} \\
+			&A_{32} = \frac{1}{2} \bm{D}_{32} \\
+			&A_{33} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{33}\right) \\
+			&A_{34} = -\left(\bm{G}_3-\bm{G}_{S 3}\right) \\
+			&A_{41} = \bm{C}_1+\frac{1}{\Delta t} \bm{M}_{P_1}+\frac{1}{2} \bm{A}_{P_1} \\ 
+			&A_{42} = \bm{C}_2+\frac{1}{\Delta t} \bm{M}_{P_2}+\frac{1}{2} \bm{A}_{P_2} \\ 
+			&A_{43} = \bm{C}_3+\frac{1}{\Delta t} \bm{M}_{P_3}+\frac{1}{2} \bm{A}_{P_3} \\ 
+			&A_{44} = \bm{G}_P \\ 
+			&b_1 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{11}\right)\right] U^n - \frac{1}{2} \bm{D}_{12} V^n - \frac{1}{2} \bm{D}_{13} W^n\\
+			&b_2 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{22}\right)\right] V^n - \frac{1}{2} \bm{D}_{21} U^n - \frac{1}{2} \bm{D}_{23} W^n\\ 
+			&b_3 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{33}\right)\right] W^n - \frac{1}{2} \bm{D}_{31} U^n - \frac{1}{2} \bm{D}_{32} V^n\\ 
+			&b_4 = \left(\frac{1}{\Delta t} \bm{M}_{P_1} - \frac{1}{2} \bm{A}_{P_1}\right) U^n
+			      +\left(\frac{1}{\Delta t} \bm{M}_{P_2} - \frac{1}{2} \bm{A}_{P 2}\right) V^n
+			      +\left(\frac{1}{\Delta t} \bm{M}_{P_3} - \frac{1}{2} \bm{A}_{P_3}\right) W^n
+		\end{aligned}
+	\end{gathered}
+\end{equation}
+
+\subsection{離散化(前進差分)}
+時間方向、移流速度ともに陽的に前進差分で線形化をすると、以下の式(\ref{fluid-matrix-explicit1}),(\ref{fluid-matrix-explicit2})が得られる。
+\begin{equation}
+\label{fluid-matrix-explicit1}
+		\left\{M+M_S\right\} \frac{u_i^{n+1}-u_i^n}{\Delta t}+\left\{\bm{A}+\bm{A}_S\right\} u_i^{n+1}-\left\{\bm{G}_i-\bm{G}_{S i}\right\} \bm{p}^{n+1}+\bm{D}_{i j} \bm{u}_j^{n+1}=0
+\end{equation}
+
+\begin{equation}
+\label{fluid-matrix-explicit2}
+		C_j u_j^{n+1}+M_{P j} \frac{u_j^{n+1}-\bm{u}_j^n}{\Delta t}+\bm{A}_{P j} \bm{u}_j^{n+1}+\bm{G}_P \bm{p}^{n+1}=0
+\end{equation}
+
+マトリックス表記すると以下のようになる。
+\begin{equation}
+	\left[\begin{array}{llll}
+		A_{11} & A_{12} & A_{13} & A_{14}\\ 
+		A_{21} & A_{22} & A_{23} & A_{24}\\ 
+		A_{31} & A_{32} & A_{33} & A_{34}\\
+		A_{41} & A_{42} & A_{43} & A_{44}
+	\end{array}
+	\right]\left
+	[
+	\begin{array}{l}
+		U^{n+1} \\ 
+		V^{n+1} \\
+		W^{n+1} \\
+		P^{n+1}
+	\end{array}
+	\right]
+	=\left[
+	\begin{array}{l}
+		b_1 \\ 
+		b_2 \\ 
+		b_3 \\
+		b_4
+	\end{array}
+	\right]
+\end{equation}
+
+マトリックスと右辺ベクトルの成分は以下のようになる。
+\begin{equation}
+	\begin{gathered}
+		\begin{aligned} 
+			&A_{11} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\left(\bm{A}+\bm{A}_S+\bm{D}_{11}\right) \\ 
+			&A_{12} = \bm{D}_{12} \\ 
+			&A_{13} = \bm{D}_{13} \\
+			&A_{14} = -\left(\bm{G}_1-\bm{G}_{S 1}\right) \\
+			&A_{21} = \bm{D}_{21} \\ 
+			&A_{22} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\left(\bm{A}+\bm{A}_S+\bm{D}_{22}\right) \\
+			&A_{23} = \bm{D}_{23} \\ 
+			&A_{24} = -\left(\bm{G}_2-\bm{G}_{S 2}\right) \\
+			&A_{31} = \bm{D}_{31} \\
+			&A_{32} = \bm{D}_{32} \\
+			&A_{33} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\left(\bm{A}+\bm{A}_S+\bm{D}_{33}\right) \\
+			&A_{34} = -\left(\bm{G}_3-\bm{G}_{S 3}\right) \\
+			&A_{41} = \bm{C}_1+\frac{1}{\Delta t} \bm{M}_{P_1}+\bm{A}_{P_1} \\ 
+			&A_{42} = \bm{C}_2+\frac{1}{\Delta t} \bm{M}_{P_2}+\bm{A}_{P_2} \\ 
+			&A_{43} = \bm{C}_3+\frac{1}{\Delta t} \bm{M}_{P_3}+\bm{A}_{P_3} \\ 
+			&A_{44} = \bm{G}_P \\ 
+			&b_1 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)\right] U^n \\
+			&b_2 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)\right] V^n \\ 
+			&b_3 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)\right] W^n \\ 
+			&b_4 = \left(\frac{1}{\Delta t} \bm{M}_{P_1}\right) U^n
+			      +\left(\frac{1}{\Delta t} \bm{M}_{P_2}\right) V^n
+			      +\left(\frac{1}{\Delta t} \bm{M}_{P_3}\right) W^n
+		\end{aligned}
+	\end{gathered}
 \end{equation}
