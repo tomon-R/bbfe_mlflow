@@ -37,7 +37,9 @@ const double      DVAL_DT_REINIT = 0.2;
 const char*    ID_EPSILON_REINIT = "#epsilon_reinit";
 const double DVAL_EPSILON_REINIT = 0.5;
 const char*      ID_DELTA_REINIT = "#delta_reinit";
-const double   DVAL_DELTA_REINIT = 1e-1;
+const double   DVAL_DELTA_REINIT = 1e-10;
+const char*   ID_MAX_ITER_REINIT = "#max_iter_reinit";
+const int   DVAL_MAX_ITER_REINIT = 5;
 const char*    ID_OUTPUT_OPTION  = "#output_option";
 const int    DVAL_OUTPUT_OPTION  = 0;
 const char*       ID_ALE_OPTION  = "#ale_option";
@@ -91,9 +93,13 @@ typedef struct
 	double dt_reinit;
 	double epsilon_reinit;
 	double delta_reinit;
+	int max_iter_reinit;
 
 	int output_option;
 	int ale_option;
+
+	int* measurement_node_id;
+	int  measurement_num_nodes;
 
 } VALUES;
 
@@ -179,9 +185,10 @@ void assign_default_values(
 
 	vals->size_interface = DVAL_SIZE_INTERFACE;
 
-	vals->dt_reinit = DVAL_DT_REINIT;
-	vals->epsilon_reinit = DVAL_EPSILON_REINIT;
-	vals->delta_reinit = DVAL_DELTA_REINIT;
+	vals->dt_reinit        = DVAL_DT_REINIT;
+	vals->epsilon_reinit   = DVAL_EPSILON_REINIT;
+	vals->delta_reinit     = DVAL_DELTA_REINIT;
+	vals->max_iter_reinit  = DVAL_MAX_ITER_REINIT;
 
 	vals->output_option    = DVAL_OUTPUT_OPTION;
 	vals->ale_option    = DVAL_ALE_OPTION;
@@ -215,6 +222,8 @@ void print_all_values(
 	printf("%s %s: %e\n", CODENAME, ID_DT_REINIT,        vals->dt_reinit);
 	printf("%s %s: %e\n", CODENAME, ID_EPSILON_REINIT,   vals->epsilon_reinit);
 	printf("%s %s: %e\n", CODENAME, ID_DELTA_REINIT,     vals->delta_reinit);
+	printf("%s %s: %d\n", CODENAME, ID_MAX_ITER_REINIT,  vals->max_iter_reinit);
+
 	printf("%s %s: %d\n", CODENAME, ID_OUTPUT_OPTION,    vals->output_option);
 	printf("%s %s: %d\n", CODENAME, ID_ALE_OPTION,       vals->ale_option);
 
@@ -278,6 +287,8 @@ void read_calc_conditions(
 				&(vals->epsilon_reinit), filename, ID_EPSILON_REINIT, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
 				&(vals->delta_reinit), filename, ID_DELTA_REINIT, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_int_p(
+				&(vals->max_iter_reinit), filename, ID_MAX_ITER_REINIT, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_int_p(
 				&(vals->output_option), filename, ID_OUTPUT_OPTION, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_int_p(
@@ -370,7 +381,16 @@ void output_files(
 
 	output_result_file_vtk(
 			&(sys->fe), &(sys->vals), fname_vtk, sys->cond.directory, t);
+}
 
+void output_mlflow_data_files(
+		FE_SYSTEM* sys,
+		int file_num,
+		int step,
+		double t)
+{
+	int myrank = monolis_mpi_get_global_my_rank();
+	char fname_vtk[BUFFER_SIZE];
 	switch(sys->vals.output_option){
 		case 1:
 			output_result_dambreak_data(&(sys->fe), sys->vals.levelset, sys->cond.directory, t);
@@ -379,7 +399,12 @@ void output_files(
 			output_result_bubble_data(&(sys->fe), &(sys->basis), sys->vals.v, sys->vals.heaviside, sys->cond.directory, t);
 			break;
 		case 3:
-			output_result_sloshing_data(&(sys->fe), sys->vals.levelset, sys->cond.directory, t);
+			if(step==0){
+				sys->vals.measurement_num_nodes = count_mlflow_measurement_node(&(sys->fe));
+				sys->vals.measurement_node_id   = BB_std_calloc_1d_int(sys->vals.measurement_node_id, sys->vals.measurement_num_nodes);
+				set_mlflow_measurement_node(&(sys->fe), sys->vals.measurement_node_id);
+			}
+			output_result_sloshing_data(&(sys->fe), sys->vals.levelset, sys->cond.directory, sys->vals.measurement_node_id, sys->vals.measurement_num_nodes, t);
 			break;
 		default:
 			break;
@@ -430,6 +455,20 @@ void BBFE_fluid_sups_read_Dirichlet_bc(
 	fclose(fp);
 }
 
+void update_Dirichlet_bc_ALE(
+		BBFE_BC* bc,
+		VALUES* vals)
+{
+	int n = bc->total_num_nodes * bc->block_size;
+	for(int i=0; i<n; i++){
+		if(bc->D_bc_exists[i]){
+			int block_id = i%(bc->block_size);
+			int node_id = (i -block_id)/(bc->block_size);
+			bc->imposed_D_val[i] = vals->v_mesh[node_id][block_id];
+			//printf("block_id, node_id D_val: %d %d %f\n", block_id, node_id, bc->imposed_D_val[i]);
+		}
+	}
+}
 
 void set_element_mat(
 		MONOLIS*     monolis,
@@ -621,12 +660,14 @@ void set_element_vec(
 				//*
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, surf_tension_ip[p], vals->accel_inertia, v_mesh_ip[p]);
+						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, 
+						surf_tension_ip[p], vals->accel_inertia, v_mesh_ip[p], vals->ale_option);
 				//*/
 				/*
 				BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, surf_tension_ip[p], vals-accel_inertia, v_mesh_ip[p]);
+						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, 
+						surf_tension_ip[p], vals-accel_inertia, v_mesh_ip[p], vals->ale_option);
 				//*/
 				for(int d=0; d<4; d++) {
 					val_ip[d][p] = vec[d];
@@ -1010,12 +1051,13 @@ void reinit_levelset(
 {
 	double t = 0.0;
 	int step = 0;
+	double error = 1.0e10;
 
 	for(int i=0; i<sys->fe.total_num_nodes; i++){
 		sys->vals.levelset_tmp[i] = sys->vals.levelset[i];
 	}
 
-	while (step<5) {
+	while (step < sys->vals.max_iter_reinit && sqrt(error)/sys->vals.dt_reinit > sys->vals.delta_reinit) {
 		t += sys->vals.dt_reinit;
 		step += 1;
 		monolis_clear_mat_value_R(&(sys->mono_reinit));
@@ -1041,7 +1083,7 @@ void reinit_levelset(
 					sys->vals.mat_max_iter,
 					sys->vals.mat_epsilon);
 
-		double error = 0.0;
+		error = 0;
 		for(int i=0; i<(sys->fe.total_num_nodes); i++) {
 			// Residual
 			error += (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]) * (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]);
@@ -1050,9 +1092,6 @@ void reinit_levelset(
 		}
 		printf("Reinitialization Step: %d\n", step);
 		printf("Error: %f, Delta: %f\n", sqrt(error)/sys->vals.dt_reinit, sys->vals.delta_reinit);
-		if(sqrt(error)/sys->vals.dt_reinit < sys->vals.delta_reinit){
-			break;
-		}
 	}
 }
 
@@ -1393,7 +1432,7 @@ void BBFE_mlflow_volume_correction(
 	double eps = 1e-10;
 	if(step == 0){
 		fprintf(fp, "%s, %s, %s, %s\n", "Time", "V_g(t)", "V_g(0)", "V_g(t)/V_g(0)");
-	}else if(step%vals->output_interval == 0){
+	}else{
 		fprintf(fp, "%lf, %lf, %lf, %lf\n", step*vals->dt, vol_gas, vals->volume_g_init, vol_gas/vals->volume_g_init*100);
 	}
 	fclose(fp);
@@ -1460,8 +1499,12 @@ int main(
 	double t = 0.0;
 	int step = 0;
 	int file_num = 0;
+
+	// Output files at t=0
 	output_files(&sys, file_num, t);
-	// Calculate initial volume of gas
+	output_mlflow_data_files(&sys, file_num+1, step, t);
+
+	// Calculate initial volume of gas at t=0
 	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), &(sys.cond), step);
 
 	while (t < sys.vals.finish_time) {
@@ -1490,6 +1533,8 @@ int main(
 		if(sys.vals.ale_option == 1){
 			// Update mesh velosity
 			BBFE_mlflow_renew_mesh_velocity(sys.vals.v_mesh, sys.vals.accel_inertia, sys.fe.total_num_nodes, sys.vals.dt);
+			// Dirichlet BC
+			update_Dirichlet_bc_ALE(&(sys.bc), &(sys.vals));
 		}
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
@@ -1612,7 +1657,9 @@ int main(
 			BBFE_mlflow_renew_mesh_position(sys.fe.x, sys.vals.v_mesh, sys.fe.total_num_nodes, sys.vals.dt);
 		}
 
-		/*********** Output result files for each intervals ***********/
+		/**************** Output result files  ****************/
+		output_mlflow_data_files(&sys, file_num+1, step, t);
+
 		if(step%sys.vals.output_interval == 0) {
 
 			BBFE_fluid_sups_renew_pressure(
