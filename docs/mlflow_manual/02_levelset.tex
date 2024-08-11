@@ -82,7 +82,7 @@ Navier-Stokes方程式(\ref{fluid-ns})と連続の式(\ref{fluid-continuum})で�
 式(\ref{sf-eq})で求められる表面張力$\bm{f}_{fs}$はNavier-Stokes方程式(\ref{fluid-ns})において体積力として作用させる。
 ここで、表面張力の計算式(\ref{sf-eq})には2階微分が含まれるので線形近似では要素内で値が0になってしまう問題がある。
 L2プロジェクションによる計算\cite{Nagrath2003}や、1階微分の値を各節点に振り分けてから1次要素で補間する方法\cite{Matsumoto2006}, \cite{Shi2019}が提案されている。
-今回は、1階微分の値を各節点に振り分けてから1次要素で補間する方法で実装した。
+今回は、L2プロジェクションにより計算した。
 
 表面張力は界面に発生するため、計算時は近似デルタ関数を用いて離散化した。
 近似デルタ関数$\delta_{\alpha}$は以下の式で計算される。
@@ -211,7 +211,7 @@ Levelset法では気液の体積が保存されなくなる問題が発生する
 ここで$\delta_{\alpha}$はデルタ関数であり、表面張力の計算時に使用している式(\ref{delta-function})のデルタ関数である。
 
 
-
+\begin{comment}
 \subsection{時間刻み幅}
 時間刻み幅は移流項に関する制限$\Delta t_{c}$、表面張力項に関する制限$\Delta t_{s}$、粘性項に関する制限$\Delta t_{v}$を満足しなければならない。
 時間制限は以下のように計算される\cite{Tsubogo2003},\cite{Sussman1994}。
@@ -232,3 +232,4 @@ Levelset法では気液の体積が保存されなくなる問題が発生する
 \begin{equation}
 	\Delta t^{n+1} \leq \frac{1}{2} min( \Delta t_{s}, \Delta t_{v}, \Delta t_{c})
 \end{equation}
+\end{comment}

@@ -42,6 +42,7 @@
 \usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{here}
+\usepackage{verbatim}
 \begin{comment}
 \lstset{ 
 basicstyle=\ttfamily\scriptsize,
@@ -110,10 +111,11 @@ morecomment=[l]{//}
 
 %\input{01_fluid}
 \input{02_levelset}
-%\input{03_code}
+\input{03_code}
 %\input{04_cavity}
 \input{05_dambreak}
 \input{06_bubble}
+\input{07_sloshing}
 
 \begin{thebibliography}{99}
 	\bibitem{Nagrath2003} Nagrath, S., Jansen, K. \& Lahey, R. T. Three Dimensional Simulation of Incompressible Two-phase Flows using a stabilized finite element method and level set approach. in vol. 56 KF.002 (2003)
@@ -164,7 +166,13 @@ morecomment=[l]{//}
 	\bibitem{Martin1952} Martin, J. C. \& Moyce, W. J. Part IV. An experimental study of the collapse of liquid columns on a rigid horizontal plane. Philos. Trans. R. Soc. Lond. 244, 312–324 (1952).
 
 	%% スロッシング
-	\bibitem{Himeno2023} https://www8.cao.go.jp/space/comittee/05-yuso/yuso-dai4/siryou3-1.pdf
+	%% \bibitem{Himeno2023} https://www8.cao.go.jp/space/comittee/05-yuso/yuso-dai4/siryou3-1.pdf
+
+	%% スロッシングの文献
+	\bibitem{Okamoto1992} Okamoto, T. TWO-DIMENSIONAL SLOSHING ANALYSIS BY THE ARBITRARY LAGRANGIAN-EULERIAN FINITE ELEMENT METHOD. Structural Eng./Earthquake Eng 8, 207s–2216.
+
+	\bibitem{Sakuraba2001} Sakuraba, M., Tanaka, S. \& Kashiyama, K. ALE parallel finite element analysis of non-linear free surface flows using PC cluster. J. Appl. Mech. 4, 113–120 (2001).
+  
 \end{thebibliography}
 
 \end{document}
