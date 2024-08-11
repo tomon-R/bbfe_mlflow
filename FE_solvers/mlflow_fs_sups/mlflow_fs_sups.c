@@ -528,11 +528,13 @@ void set_element_mat(
 				for(int p=0; p<np; p++) {
 					double tau = BBFE_elemmat_fluid_sups_coef(
 							density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+					double tau_c = BBFE_elemmat_mlflow_shock_capturing_coef(
+							density_ip[p], viscosity_ip[p], v_ip[p], h_e);
 
 					BBFE_elemmat_fluid_sups_mat(
 							A, basis->N[p][i], basis->N[p][j], 
 							fe->geo[e][p].grad_N[i], fe->geo[e][p].grad_N[j], 
-							v_ip[p], density_ip[p], viscosity_ip[p], tau, vals->dt, v_mesh_ip[p]);
+							v_ip[p], density_ip[p], viscosity_ip[p], tau, tau_c, vals->dt, v_mesh_ip[p]);
 
 					for(int a=0; a<4; a++){
 						for(int b=0; b<4; b++) {
