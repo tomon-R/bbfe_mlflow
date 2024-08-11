@@ -68,6 +68,7 @@ void BBFE_elemmat_fluid_sups_mat_crank_nicolson(
 		const double   density,
 		const double   viscosity,
 		const double   tau,
+		const double   tau_c,
 		const double   dt,
 		const double   v_mesh[3]);
 

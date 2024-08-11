@@ -668,7 +668,7 @@ void set_element_vec(
 				/*
 				BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, vals->dt, vals->gravity, 
+						v_ip[p], grad_v_ip[p], density_ip[p], viscosity_ip[p] ,tau, tau_c, vals->dt, vals->gravity, 
 						surf_tension_ip[p], vals-accel_inertia, v_mesh_ip[p], vals->ale_option);
 				//*/
 				for(int d=0; d<4; d++) {
