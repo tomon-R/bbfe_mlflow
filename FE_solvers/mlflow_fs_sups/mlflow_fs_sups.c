@@ -396,7 +396,7 @@ void output_mlflow_data_files(
 			output_result_dambreak_data(&(sys->fe), sys->vals.levelset, sys->cond.directory, t);
 			break;
 		case 2:
-			output_result_bubble_data(&(sys->fe), &(sys->basis), sys->vals.v, sys->vals.heaviside, sys->cond.directory, t);
+			output_result_bubble_data(&(sys->fe), &(sys->basis), &(sys->mono_com), sys->vals.v, sys->vals.heaviside, sys->cond.directory, t);
 			break;
 		case 3:
 			if(step==0){
@@ -1253,7 +1253,6 @@ void reinit_CLSM(
 		t += sys->vals.dt_reinit;
 		step += 1;
 		monolis_clear_mat_value_R(&(sys->mono_reinit));
-		monolis_clear_mat_value_rhs_R(&(sys->mono_reinit));
 		
 		set_element_mat_CLSM_reinitialize(
 					&(sys->mono_reinit),
@@ -1524,7 +1523,6 @@ int main(
 		monolis_clear_mat_value_R(&(sys.monolis));
 		
 		monolis_clear_mat_value_R(&(sys.mono_levelset));
-		monolis_clear_mat_value_rhs_R(&(sys.mono_levelset));
 
 		monolis_clear_mat_value_rhs_R(&(sys.mono_L2));
 

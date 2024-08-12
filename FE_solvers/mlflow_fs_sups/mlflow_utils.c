@@ -143,6 +143,7 @@ void output_result_dambreak_data(
 double calc_data_bubble(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis,
+		MONOLIS_COM* monolis_com,
 		double** v,
 		double* heaviside,
 		double*      data)
@@ -216,6 +217,10 @@ double calc_data_bubble(
 		}
 	}
 
+	monolis_allreduce_R(1, &mean_vel_z, MONOLIS_MPI_SUM, monolis_com->comm);
+	monolis_allreduce_R(1, &mean_pos_z, MONOLIS_MPI_SUM, monolis_com->comm);
+	monolis_allreduce_R(1, &total_vol, MONOLIS_MPI_SUM, monolis_com->comm);
+
 	data[0] = mean_pos_z / total_vol;
 	data[1] = mean_vel_z / total_vol;
 	data[2] = total_vol / (0.25*0.25*0.25*4/3*M_PI);
@@ -234,6 +239,7 @@ double calc_data_bubble(
 void output_result_bubble_data(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis,
+		MONOLIS_COM* monolis_com,
 		double** v,
 		double*  heaviside,
 		const char* directory,
@@ -241,20 +247,20 @@ void output_result_bubble_data(
 {
 	char filename[BUFFER_SIZE];
 	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_BUBBLE);
-
-	FILE* fp;
-	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
-
 	double* data = BB_std_calloc_1d_double(data, 4);
+	int myrank = monolis_mpi_get_global_my_rank();
 
-	calc_data_bubble(fe, basis, v, heaviside, data);
+	calc_data_bubble(fe, basis, monolis_com, v, heaviside, data);
 
-	if(abs(time-0.0)<EPS){
-		fprintf(fp, "%s, %s, %s, %s, %s\n", "Time", "z", "vz", "sphericity", "size");
+	if(myrank == 0){
+		FILE* fp;
+		fp = BBFE_sys_write_add_fopen(fp, filename, directory);
+		if(abs(time-0.0)<EPS){
+			fprintf(fp, "%s, %s, %s, %s, %s\n", "Time", "z", "vz", "sphericity", "size");
+		}
+		fprintf(fp, "%lf, %lf, %lf, %lf, %lf\n", time, data[0], data[1], data[2], data[3]);
+		fclose(fp);
 	}
-	fprintf(fp, "%lf, %lf, %lf, %lf, %lf\n", time, data[0], data[1], data[2], data[3]);
-	
-	fclose(fp);
 
 	BB_std_free_1d_double(data, 4);
 
@@ -341,6 +347,7 @@ void output_result_sloshing_data(
 			fprintf(fp, "%lf\n", z_zero);
 			//fprintf(fp, "%lf, %lf\n", z2, p2);
 		}else if(abs(pairs_z[i].value)<EPS){
+			fprintf(fp, "%lf, ", time);
 			fprintf(fp, "%lf\n", pairs_z[i].key);
 		}
 	}

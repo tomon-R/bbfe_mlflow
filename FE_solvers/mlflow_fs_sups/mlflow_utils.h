@@ -15,6 +15,7 @@ void output_result_dambreak_data(
 double calc_data_bubble(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis,
+		MONOLIS_COM* monolis_com,
 		double** v,
 		double*  heaviside,
 		double*      data);
@@ -22,6 +23,7 @@ double calc_data_bubble(
 void output_result_bubble_data(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis,
+		MONOLIS_COM* monolis_com,
 		double** v,
 		double*  heaviside,
 		const char* directory,
