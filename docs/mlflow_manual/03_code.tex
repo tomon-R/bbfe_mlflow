@@ -695,17 +695,17 @@ mpirun -np 2 ./mlflow_fs ./damBreak-parallel/
 \begin{lstlisting}[]
 # workspaceディレクトリで
 
-./make_dambreak_allnoslip.sh 40 6 24 0.584 0.0876 0.3504
+./input_generator_dambreak_allnoslip.sh 40 6 24 0.584 0.0876 0.3504
 
-./make_dambreak_allnoslip.sh 80 2 60 0.584 0.0146 0.438
+./input_generator_dambreak_allnoslip.sh 80 2 60 0.584 0.0146 0.438
 
 \end{lstlisting}
 
 \begin{lstlisting}[]
 # workspaceディレクトリで
 
-make_3d_bubble_allnoslip 20 20 40 1.0 0.1 2.0
+./input_generator_3d_bubble_allnoslip 20 20 40 1.0 0.1 2.0
 
-make_3d_bubble_allnoslip 40 40 80 1.0 0.1 2.0
+./input_generator_3d_bubble_allnoslip 40 40 80 1.0 0.1 2.0
 
 \end{lstlisting}

@@ -64,7 +64,7 @@ $ make
 ### 入力ファイルの準備
 ```shell
 $ cd ./util/workspace #入力ファイル作成などの作業用ディレクトリに移動
-$ make_sloshing_allnoslip.sh 40 8 48 1.0 0.2 1.2 #一例としてスロッシングの入力ファイルを造るシェルの実行
+$ input_generator_sloshing_allnoslip.sh 40 8 48 1.0 0.2 1.2 #一例としてスロッシングの入力ファイルを造るシェルの実行
 $ ls #Sloshing_40_8_1.0_0.2_1.2のようなフォルダが作成され、中にnode.dat, elem.dat, levelset.dat, D_bc_v.datがあることを確認する
 $ cp Sloshing_40_8_1.0_0.2_1.2/*.dat ../FE_solvers/mlflow_fs_sups/sloshing #mlflow_fs_sups下に解析用フォルダ(sloshing)を作っておきそこに入れる
 $ #cond.datファイルは最初から準備されているか、なければ自分で作成し解析用フォルダに入れておく
@@ -161,7 +161,7 @@ $ mpirun -np 4 ./mlflow_fs ./damBreak-parallel/
 #### 入力ファイルの準備
 ```shell
 $ cd ./util/workspace
-$ ./make_dambreak_allnoslip.sh 40 6 40 0.584 0.0876 0.584
+$ ./input_generator_dambreak_allnoslip.sh 40 6 40 0.584 0.0876 0.584
 ```
 
 #### 解析結果
@@ -171,7 +171,7 @@ $ ./make_dambreak_allnoslip.sh 40 6 40 0.584 0.0876 0.584
 #### 入力ファイルの準備
 ```shell
 $ cd ./util/workspace
-$ ./make_3d_bubble_allnoslip.sh 40 40 80 1 1 2
+$ ./input_generator_3d_bubble_allnoslip.sh 40 40 80 1 1 2
 ```
 
 #### 解析結果
@@ -181,7 +181,7 @@ $ ./make_3d_bubble_allnoslip.sh 40 40 80 1 1 2
 #### 入力ファイルの準備
 ```shell
 $ cd ./util/workspace
-$ make_sloshing_allnoslip.sh 40 8 48 1.0 0.2 1.2
+$ input_generator_sloshing_allnoslip.sh 40 8 48 1.0 0.2 1.2
 ```
 
 #### 解析結果
