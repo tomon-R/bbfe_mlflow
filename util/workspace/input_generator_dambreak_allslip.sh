@@ -40,7 +40,7 @@ z_max=$(echo "scale=5; $x_max * 2" | bc)
 echo -e "../mesh/levelset_gen $OPTION $x_min $y_min $z_min $x_max $y_max $z_max \n"
 ../mesh/levelset_gen $OPTION $x_min $y_min $z_min $x_max $y_max $z_max
 
-DIR_NAME="Dambreak_"$1"_"$2"_"$3"_"$4"_"$5"_"$6
+DIR_NAME="Dambreak_allslip_"$1"_"$2"_"$3"_"$4"_"$5"_"$6
 
 echo -e " mkdir $DIR_NAME \n"
 mkdir $DIR_NAME
