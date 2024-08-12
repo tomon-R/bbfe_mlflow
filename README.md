@@ -129,6 +129,20 @@ $ cd ../FE_solvers/mlflow_fs_sups/ #ソルバーのディレクトリに移動
 $ ./mlflow_fs_sups ./sloshing #解析用フォルダ(sloshing)に結果ファイルが保存されていく
 ```
 
+## 並列計算実行方法
+```shell
+$ # インプットファイルがあるフォルダへ移動
+$ # node.dat と elem.dat を分割(例として領域分割数が4の場合)
+$ ../../../submodule/monolis/bin/gedatsu_simple_mesh_partitioner -n 4
+$ # D_bc*.dat を分割
+$ ../../../submodule/monolis/bin/gedatsu_bc_partitioner_R -n 4 -ig node.dat -i D_bc_v.dat
+$ # levelset.dat を分割
+$ ../../../submodule/monolis/bin/gedatsu_dist_val_partitioner_R -ig node.dat -i levelset.dat -n 4
+$ # parted.0フォルダが作成されており、中に分割された入力ファイルが作成されていることを確認
+$ # 並列計算実行
+$ mpirun -np 4 ./mlflow_fs ./damBreak-parallel/
+```
+
 ## 解析結果の確認
 ### 可視化
 
@@ -141,9 +155,34 @@ $ ./mlflow_fs_sups ./sloshing #解析用フォルダ(sloshing)に結果ファイ
 - util/workspace/data/sloshingなどのフォルダにcsvファイルを入れる
 - util/workspace/graph_sloshing.pltを実行することでグラフ化できる
 
-## ベンチマーク
+## ベンチマーク問題の解析事例
+
 ### ダムブレイク
+#### 入力ファイルの準備
+```shell
+$ cd ./util/workspace
+$ ./make_dambreak_allnoslip.sh 40 6 40 0.584 0.0876 0.584
+```
+
+#### 解析結果
+![dambreak-result](./docs/mlflow_manual/pics/3d-dambreak/result.gif)
 
 ### 気泡上昇流れ
+#### 入力ファイルの準備
+```shell
+$ cd ./util/workspace
+$ ./make_3d_bubble_allnoslip.sh 40 40 80 1 1 2
+```
+
+#### 解析結果
+![bubble-result-tc1](./docs/mlflow_manual/pics/3d-bubble/tc1/result.gif)
 
 ### スロッシング
+#### 入力ファイルの準備
+```shell
+$ cd ./util/workspace
+$ make_sloshing_allnoslip.sh 40 8 48 1.0 0.2 1.2
+```
+
+#### 解析結果
+![sloshing-result](./docs/mlflow_manual/pics/3d-sloshing/CN-dx0025/result.gif)
