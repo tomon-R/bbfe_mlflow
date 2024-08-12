@@ -1,5 +1,5 @@
 \newpage
-\section{非圧縮性粘性流れの計算}
+\section{非圧縮性粘性流れの計算}\label{sec:fluid}
 \subsection{支配方程式}
 非圧縮性粘性流れの運動方程式は以下のNavier-Stokes方程式によって記述される。
 \begin{equation}
@@ -16,37 +16,61 @@
 流体は非圧縮性粘性を仮定しているため、Navier-Stokes方程式(\ref{fluid-ns})と非圧縮性の連続の式(\ref{fluid-continuum})を解く。
 
 \subsection{直接法による定式化}
+直接法は、Navier-Stokes方程式と連続の式に対して直接離散化を行い、流れ場と圧力場を分離せずに同時に解く方法である。
+以前まではFractional Step法による分離型解法によって流体を解いていたが、自由表面流れにおいては密度差を大きくすると界面の不連続性による不安定性と非圧縮性の制約による圧力計算の不安定性と思われる現象により計算が破綻してしまった。
+今回直接法を適用することにより、密度差の大きい条件でも安定に解析することが可能となった。
 
 \subsection{安定化有限要素法による離散化}
 同次補間要素の使用を可能にするGLS法をにより離散化すると式(\ref{fluid-GLS})となる。
 \begin{equation}
 \label{fluid-GLS}
 	\begin{aligned} 
-		\int_{\Omega} w_i^h & \left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}\right) d \Omega+\int_{\Omega} \frac{\partial w_i^h}{\partial x_j}\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) d \Omega+\int_{\Omega} q^h \frac{\partial u_i^h}{\partial x_i} d \Omega \\ & 
-		+\sum_{e=1}^M \int_{\Omega_e} \tau_m^e\left(\frac{\partial w_i^h}{\partial t}+u_j^h \frac{\partial w_i^h}{\partial x_j}+\frac{\partial q^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 w_i^h}{\partial x_j^2}\right)\left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}+\frac{\partial p^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 u_i^h}{\partial x_j^2}\right) d \Omega \\ & 
-		+\sum_{e=1}^M \int_{\Omega_e} \tau_c^e\left(\frac{\partial w_i^h}{\partial x_i} \frac{\partial u_j^h}{\partial x_j}\right) d \Omega=\int_{\Gamma_h} w_i^h\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) n_j d \Gamma
+		\int_{\Omega} w_i^h & \left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}\right) d \Omega
+		+ \int_{\Omega} \frac{\partial w_i^h}{\partial x_j}\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) d \Omega
+		+ \int_{\Omega} q^h \frac{\partial u_i^h}{\partial x_i} d \Omega \\ & 
+		+ \sum_{e=1}^M \int_{\Omega_e} \tau_m^e\left(\frac{\partial w_i^h}{\partial t}+u_j^h \frac{\partial w_i^h}{\partial x_j}+\frac{\partial q^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 w_i^h}{\partial x_j^2}\right)\left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}+\frac{\partial p^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 u_i^h}{\partial x_j^2}\right) d \Omega \\ & 
+		+ \sum_{e=1}^M \int_{\Omega_e} \tau_c^e\left(\frac{\partial w_i^h}{\partial x_i} \frac{\partial u_i^h}{\partial x_i}\right) d \Omega
+		= \int_{\Gamma_h} w_i^h\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) n_j d \Gamma
+	\end{aligned}
+\end{equation}
+ここで$e$は要素のインデックス、$M$は全要素数、$\Omega_{e}$は要素領域、$\tau_{m}$はSUPGとPSPGの安定化パラメータ($\tau_{m}=\tau_{SUPG}=\tau_{PSPG}$)、$\tau_{c}$は衝撃捕捉項の安定化パラメータである。
+
+1次要素では次式(\ref{fluid-SUPG-PSPG})のようになり、SUPG/PSPG法による定式化と等価となる。第5項は衝撃捕捉項であり、自由表面流れでは境界層内での解を安定にする効果を持つ。
+\begin{equation}
+\label{fluid-SUPG-PSPG}
+	\begin{aligned}
+		& \int_{\Omega} w_i^h\left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}\right) d \Omega+\int_{\Omega} \frac{\partial w_i^h}{\partial x_j}\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) d \Omega+\int_{\Omega} q^h \frac{\partial u_i^h}{\partial x_i} d \Omega \\
+		& +\sum_{e=1}^M \int_{\Omega_e} \tau_m^e\left(u_j^h \frac{\partial w_i^h}{\partial x_j}+\frac{\partial q^h}{\partial x_i}\right)\left(\frac{\partial u_i^h}{\partial t}+u_j^h \frac{\partial u_i^h}{\partial x_j}+\frac{\partial p^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 u_i^h}{\partial x_j^2}\right) d \Omega \\
+		& + \sum_{e=1}^M \int_{\Omega_e} \tau_c^e\left(\frac{\partial w_i^h}{\partial x_i} \frac{\partial u_i^h}{\partial x_i}\right) d \Omega 
+		= \int_{\Gamma_h} w_i^h\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) n_j d \Gamma
 	\end{aligned}
 \end{equation}
 
-安定化パラメータは以下の通り。
-
-ここで$e$は要素のインデックス、$M$は全要素数、$\Omega_{e}$は要素領域、$\tau_{m}$は安定化パラメータであり、要素での安定化パラメータ$\tau_{m}^{e}$は次式(\ref{supg-tau})で与えられる。
+要素での安定化パラメータ$\tau_{m}^{e}$は次式(\ref{supg-tau})で与えられる。
 \begin{equation}
 \label{supg-tau}
 	\tau_{m}^{e}=\left[ \left(\frac{2}{\Delta t}\right)^{2} + \left(\frac{2||\bm{u}||}{h_{e}}\right)^{2} + \left(\frac{4}{\mathrm{Re_{v}} h_{e}^{2}}\right)^{2}\right]^{-1/2}
 \end{equation}
-$\Delta t$は時間刻み幅、$\bm{u}$は流速、$h_e$は要素サイズ、$\mathrm{Re_u}$は要素レイノルズ数である。
+ここで、$\Delta t$は時間刻み幅、$\bm{u}$は流速、$h_e$は要素サイズ、$\mathrm{Re_u}$は要素レイノルズ数である。
 
-$\tau_{c}$は衝撃捕捉項の安定化パラメータであり、境界層内での解を安定化させる。
+$\tau_{c}$は衝撃捕捉項の安定化パラメータであり、次式(\ref{shock-capturing-tau})で与えられる。
 \begin{equation}
-	\begin{aligned} \tau_c & =\frac{h_e}{2}\left\|u_i^h\right\| z\left(R e_u\right) \\ z\left(R e_u\right) & = \begin{cases}R e_u / 3 & \left(0 \leq R e_u \leq 3\right) \\ 1 & \left(3 \leq R e_u\right)\end{cases} \end{aligned}
+\label{shock-capturing-tau}
+	\begin{aligned} 
+		\tau_c & =\frac{h_e}{2}\left\|u_i^h\right\| z\left(R e_u\right) \\ z\left(R e_u\right) & = 
+			\begin{cases}
+				R e_u / 3 & \left(0 \leq R e_u \leq 3\right) \\ 
+				1         & \left(3 \leq R e_u\right)
+			\end{cases} 
+	\end{aligned}
 \end{equation}
+解析事例でも述べるが、衝撃捕捉項を入れない場合、スロッシング解析においては途中で計算が不安定になることが確認され、衝撃捕捉項を入れることにより安定に計算することが可能となった。
 
 非線形常微分方程式は式(\ref{fluid-GLS-matrix1}), (\ref{fluid-GLS-matrix2})となる。
 \begin{equation}
 \label{fluid-GLS-matrix1}
 	\left(\bm{M}+\bm{M}_S\right) \frac{d \bm{u}_i}{d t} 
-	+ \left(\bm{A}\left(\bm{u}_j\right)+\bm{A}_S\left(\bm{u}_j\right)\right) \bm{u}_i
+	+ \left(\bm{A}\left(\bm{u}_j\right) + \bm{A}_S\left(\bm{u}_j\right) + \bm{C}_{Si} \right) \bm{u}_i
 	- \left(\bm{G}_i-\bm{G}_{S i}\right) \bm{p}
 	+ \bm{D}_{i j} \bm{u}_j=\bm{F}_i
 \end{equation}
@@ -62,7 +86,11 @@ $\tau_{c}$は衝撃捕捉項の安定化パラメータであり、境界層内�
 時間方向にCrank-Nicolson法を適用し、移流速度に対して2次精度Adams-Bashforth法を用いて線形化をすると、以下の式(\ref{fluid-matrix-CN1})が得られる。
 \begin{equation}
 \label{fluid-matrix-CN1}
-		\left\{M+M_S\right\} \frac{u_i^{n+1}-u_i^n}{\Delta t}+\left\{\bm{A}+\bm{A}_S\right\} u_i^{n+1 / 2}-\left\{\bm{G}_i-\bm{G}_{S i}\right\} \bm{p}^{n+1}+\bm{D}_{i j} \bm{u}_j^{n+1 / 2}=0
+		\left\{M+M_S\right\} \frac{u_i^{n+1}-u_i^n}{\Delta t}
+		+ \left\{\bm{A} + \bm{A}_S + \bm{C}_{Si}\right\} u_i^{n+1 / 2}
+		- \left\{\bm{G}_i - \bm{G}_{S i}\right\} \bm{p}^{n+1}
+		+ \bm{D}_{i j} \bm{u}_j^{n+1 / 2}
+		= 0
 \end{equation}
 
 \begin{equation}
@@ -101,25 +129,25 @@ $\tau_{c}$は衝撃捕捉項の安定化パラメータであり、境界層内�
 \begin{equation}
 	\begin{gathered}
 		\begin{aligned} 
-			&A_{11} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{11}\right) \\ 
+			&A_{11} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{11}+\bm{C}_{S1}\right) \\ 
 			&A_{12} = \frac{1}{2} \bm{D}_{12} \\ 
 			&A_{13} = \frac{1}{2} \bm{D}_{13} \\
 			&A_{14} = -\left(\bm{G}_1-\bm{G}_{S 1}\right) \\
 			&A_{21} = \frac{1}{2} \bm{D}_{21} \\ 
-			&A_{22} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{22}\right) \\
+			&A_{22} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{22}+\bm{C}_{S2}\right) \\
 			&A_{23} = \frac{1}{2} \bm{D}_{23} \\ 
 			&A_{24} = -\left(\bm{G}_2-\bm{G}_{S 2}\right) \\
 			&A_{31} = \frac{1}{2} \bm{D}_{31} \\
 			&A_{32} = \frac{1}{2} \bm{D}_{32} \\
-			&A_{33} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{33}\right) \\
+			&A_{33} = \frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)+\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{33}+\bm{C}_{S3}\right) \\
 			&A_{34} = -\left(\bm{G}_3-\bm{G}_{S 3}\right) \\
 			&A_{41} = \bm{C}_1+\frac{1}{\Delta t} \bm{M}_{P_1}+\frac{1}{2} \bm{A}_{P_1} \\ 
 			&A_{42} = \bm{C}_2+\frac{1}{\Delta t} \bm{M}_{P_2}+\frac{1}{2} \bm{A}_{P_2} \\ 
 			&A_{43} = \bm{C}_3+\frac{1}{\Delta t} \bm{M}_{P_3}+\frac{1}{2} \bm{A}_{P_3} \\ 
 			&A_{44} = \bm{G}_P \\ 
-			&b_1 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{11}\right)\right] U^n - \frac{1}{2} \bm{D}_{12} V^n - \frac{1}{2} \bm{D}_{13} W^n\\
-			&b_2 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{22}\right)\right] V^n - \frac{1}{2} \bm{D}_{21} U^n - \frac{1}{2} \bm{D}_{23} W^n\\ 
-			&b_3 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{33}\right)\right] W^n - \frac{1}{2} \bm{D}_{31} U^n - \frac{1}{2} \bm{D}_{32} V^n\\ 
+			&b_1 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{11}+\bm{C}_{S1}\right)\right] U^n - \frac{1}{2} \bm{D}_{12} V^n - \frac{1}{2} \bm{D}_{13} W^n\\
+			&b_2 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{22}+\bm{C}_{S2}\right)\right] V^n - \frac{1}{2} \bm{D}_{21} U^n - \frac{1}{2} \bm{D}_{23} W^n\\ 
+			&b_3 = \left[\frac{1}{\Delta t}\left(\bm{M}+\bm{M}_S\right)-\frac{1}{2}\left(\bm{A}+\bm{A}_S+\bm{D}_{33}+\bm{C}_{S3}\right)\right] W^n - \frac{1}{2} \bm{D}_{31} U^n - \frac{1}{2} \bm{D}_{32} V^n\\ 
 			&b_4 = \left(\frac{1}{\Delta t} \bm{M}_{P_1} - \frac{1}{2} \bm{A}_{P_1}\right) U^n
 			      +\left(\frac{1}{\Delta t} \bm{M}_{P_2} - \frac{1}{2} \bm{A}_{P 2}\right) V^n
 			      +\left(\frac{1}{\Delta t} \bm{M}_{P_3} - \frac{1}{2} \bm{A}_{P_3}\right) W^n
@@ -127,6 +155,7 @@ $\tau_{c}$は衝撃捕捉項の安定化パラメータであり、境界層内�
 	\end{gathered}
 \end{equation}
 
+\begin{comment}
 \subsection{離散化(前進差分)}
 時間方向、移流速度ともに陽的に前進差分で線形化をすると、以下の式(\ref{fluid-matrix-explicit1}),(\ref{fluid-matrix-explicit2})が得られる。
 \begin{equation}
@@ -195,3 +224,4 @@ $\tau_{c}$は衝撃捕捉項の安定化パラメータであり、境界層内�
 		\end{aligned}
 	\end{gathered}
 \end{equation}
+\end{comment}
