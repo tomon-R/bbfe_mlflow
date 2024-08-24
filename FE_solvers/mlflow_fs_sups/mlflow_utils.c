@@ -306,15 +306,13 @@ void output_result_sloshing_data(
 {
 	char filename[BUFFER_SIZE];
 	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_SLOSHING);
-
-	FILE* fp;
-	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
+	int myrank = monolis_mpi_get_global_my_rank();
 
 	double* z     = BB_std_calloc_1d_double(z, num_nodes);
 	double* phi_z = BB_std_calloc_1d_double(phi_z, num_nodes);
 	Pair *pairs_z = (Pair*)malloc(num_nodes * sizeof(Pair));
     if (pairs_z == NULL) {
-        fprintf(stderr, "Error of memory allocation\n");
+        printf("Memory allocation error\n");
         exit(1);
     }
 	for(int i=0; i<num_nodes; i++){
@@ -329,10 +327,14 @@ void output_result_sloshing_data(
 
 	qsort(pairs_z, num_nodes, sizeof(Pair), compare);
 
-	if(abs(time-0.0)<EPS){
-		fprintf(fp, "%s, %s, \n", "Time", "z");
+	FILE* fp;
+	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
+
+	if(myrank == 0){
+		if(abs(time-0.0)<EPS){
+			fprintf(fp, "%s, %s, \n", "Time", "z");
+		}
 	}
-	
 	for(int i=0; i<num_nodes-1;i++){
 		if(pairs_z[i].value>0 && pairs_z[i+1].value<0){
 			double z1 = pairs_z[i].key;
@@ -343,12 +345,11 @@ void output_result_sloshing_data(
 			double z_zero = (p1*z2 - p2*z1)/(p1 - p2);
 			
 			fprintf(fp, "%lf, ", time);
-			//fprintf(fp, "%lf, %lf\n", z1, p1);
 			fprintf(fp, "%lf\n", z_zero);
-			//fprintf(fp, "%lf, %lf\n", z2, p2);
+
 		}else if(abs(pairs_z[i].value)<EPS){
-			fprintf(fp, "%lf, ", time);
-			fprintf(fp, "%lf\n", pairs_z[i].key);
+			//fprintf(fp, "%lf, ", time);
+			//fprintf(fp, "%lf\n", pairs_z[i].key);
 		}
 	}
 	BB_std_free_1d_double(z, num_nodes);
