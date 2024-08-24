@@ -31,7 +31,7 @@
 		Test case & $\Delta t$ & メッシュ幅$dx$ & 界面幅$D$ & 再初期化回数 & 再初期化$\Delta \tau$\\
 		\hline 
 		Case$1$ & $0.0025$ & $0.025$ & $0.075$ & $5$ & $0.0001$\\
-		Case$2$ & $0.0010$ & $0.010$ & $0.030$ & $5$ & $0.0001$\\
+		Case$2$ & $0.0010$ & $0.0125$ & $0.030$ & $5$ & $0.0001$\\
 		\hline         
 	\end{tabular}
 	\label{table:3d-sloshing-parameter}
@@ -119,6 +119,9 @@
 	\label{fig:sloshing-result}
 \end{figure}
 
+解析結果の左端の水位の時間変化のグラフを図~\ref{fig:3d-sloshing-result}に示す。
+流体メッシュは固定して慣性加速度を与えた場合と、流体メッシュに加速度を与えて移動させた場合（ALE）の結果を比較し、どちらも近い結果が得られた。
+さらにメッシュを粗いケースと細かいケースで計算したところ、細かくすることによって文献の値により近い結果が得られた。
 \begin{figure}[H]
     \centering
 	\includegraphics[width=15truecm]{pics/3d-sloshing/height_time.pdf}
@@ -185,11 +188,26 @@
 \end{figure}
 
 \subsubsection{並列化解析結果}
-並列化させた場合の結果と計算時間の比較を示す。
+並列化解析で途中で収束しないエラーが起きている。
 
 \begin{figure}[H]
     \centering
 	\includegraphics[width=15truecm]{pics/3d-sloshing/CN-dx0010/Error-parallel.png}
+	\caption{並列化エラー}
+	\label{fig:3d-sloshing-error-parallel}
+\end{figure}
+
+
+\begin{figure}[H]
+    \centering
+	\includegraphics[width=15truecm]{pics/3d-bubble/Error-parallel.png}
+	\caption{並列化エラー}
+	\label{fig:3d-sloshing-error-parallel}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+	\includegraphics[width=15truecm]{pics/3d-bubble/Error-parallel-NaN.png}
 	\caption{並列化エラー}
 	\label{fig:3d-sloshing-error-parallel}
 \end{figure}

@@ -199,9 +199,130 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	\label{fig:dambreak-result}
 \end{figure}
 
+\subsection{高粘性流体のケース（コンクリートのビンガム流体を想定した事前検討）}
+
+コンクリートの物性値は文献\cite{Saito2012}より、密度$\rho=3000\mathrm{kg/m^3}$、粘性係数は$\mu = 1 \mathrm{kg/(m\cdot s)}$と$\mu=1000 \mathrm{kg/(m\cdot s)}$の2パターンで確認した。
+どちらのケースでも水と空気のダムブレイクから物性値だけを変えた解析条件で安定に解析できた。
+
+\subsubsection{$\mu = 1 \mathrm{kg/(m\cdot s)}$のケース}
+\begin{figure}[H]
+	\centering
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0000.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0010.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0020.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0030.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0040.jpeg}
+	\end{minipage}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1 \mathrm{kg/(m\cdot s)}$の場合)}
+	\label{fig:dambreak-result-visc1}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0050.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0060.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0070.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0080.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0090.jpeg}
+	\end{minipage}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1 \mathrm{kg/(m\cdot s)}$の場合)}
+	\label{fig:dambreak-result-visc1}
+\end{figure}
+
+
+\subsubsection{$\mu = 1000 \mathrm{kg/(m\cdot s)}$のケース}
+
+\begin{figure}[H]
+	\centering
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0000.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0010.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0020.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0030.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0040.jpeg}
+	\end{minipage}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1000 \mathrm{kg/(m\cdot s)}$の場合)}
+	\label{fig:dambreak-result-visc1000}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0050.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0060.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0070.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0080.jpeg}
+	\end{minipage}
+	\begin{minipage}[b]{0.19\columnwidth}
+	    \centering
+	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0090.jpeg}
+	\end{minipage}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1000 \mathrm{kg/(m\cdot s)}$の場合)}
+	\label{fig:dambreak-result-visc1000}
+\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=10truecm]{pics/3d-dambreak/Concrete-reference.png}
+	\caption{ビンガム流体の計算の参考文献の結果\cite{Saito2012}}
+	\label{fig:3d-dambreak-concrete-reference}
+\end{figure}
+
 
 \subsection{並列解析結果}
-TBA。現状体積保存の所が並列化未対応。
+TBA
 
 \begin{comment}
 本ソルバーは領域分割法によるMPI並列化にも対応しているため、
