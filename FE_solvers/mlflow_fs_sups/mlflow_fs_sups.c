@@ -38,6 +38,8 @@ const char*    ID_EPSILON_REINIT = "#epsilon_reinit";
 const double DVAL_EPSILON_REINIT = 0.5;
 const char*      ID_DELTA_REINIT = "#delta_reinit";
 const double   DVAL_DELTA_REINIT = 1e-10;
+const char*      ID_ALPHA_REINIT = "#alpha_reinit";
+const double   DVAL_ALPHA_REINIT = 1e-7;
 const char*   ID_MAX_ITER_REINIT = "#max_iter_reinit";
 const int   DVAL_MAX_ITER_REINIT = 5;
 const char*    ID_OUTPUT_OPTION  = "#output_option";
@@ -93,6 +95,7 @@ typedef struct
 	double dt_reinit;
 	double epsilon_reinit;
 	double delta_reinit;
+	double alpha_reinit;
 	int max_iter_reinit;
 
 	int output_option;
@@ -188,6 +191,7 @@ void assign_default_values(
 	vals->dt_reinit        = DVAL_DT_REINIT;
 	vals->epsilon_reinit   = DVAL_EPSILON_REINIT;
 	vals->delta_reinit     = DVAL_DELTA_REINIT;
+	vals->alpha_reinit     = DVAL_ALPHA_REINIT;
 	vals->max_iter_reinit  = DVAL_MAX_ITER_REINIT;
 
 	vals->output_option    = DVAL_OUTPUT_OPTION;
@@ -222,6 +226,7 @@ void print_all_values(
 	printf("%s %s: %e\n", CODENAME, ID_DT_REINIT,        vals->dt_reinit);
 	printf("%s %s: %e\n", CODENAME, ID_EPSILON_REINIT,   vals->epsilon_reinit);
 	printf("%s %s: %e\n", CODENAME, ID_DELTA_REINIT,     vals->delta_reinit);
+	printf("%s %s: %e\n", CODENAME, ID_ALPHA_REINIT,     vals->alpha_reinit);
 	printf("%s %s: %d\n", CODENAME, ID_MAX_ITER_REINIT,  vals->max_iter_reinit);
 
 	printf("%s %s: %d\n", CODENAME, ID_OUTPUT_OPTION,    vals->output_option);
@@ -287,6 +292,8 @@ void read_calc_conditions(
 				&(vals->epsilon_reinit), filename, ID_EPSILON_REINIT, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_double_p(
 				&(vals->delta_reinit), filename, ID_DELTA_REINIT, BUFFER_SIZE, CODENAME);
+		num = BB_std_read_file_get_val_double_p(
+				&(vals->alpha_reinit), filename, ID_ALPHA_REINIT, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_int_p(
 				&(vals->max_iter_reinit), filename, ID_MAX_ITER_REINIT, BUFFER_SIZE, CODENAME);
 		num = BB_std_read_file_get_val_int_p(
@@ -1033,7 +1040,9 @@ void set_element_vec_levelset_reinitialize(
 		for(int i=0; i<nl; i++) {
 			for(int p=0; p<np; p++) {
 				val_ip[p] = BBFE_elemmat_vec_levelset_reinitialize(
-					basis->N[p][i], levelset_ip[p], levelset_ip_tmp[p], grad_phi_ip[p], vals->dt_reinit, vals->epsilon_reinit);
+					basis->N[p][i], fe->geo[e][p].grad_N[i],
+					levelset_ip[p], levelset_ip_tmp[p], grad_phi_ip[p], 
+					vals->dt_reinit, vals->epsilon_reinit, vals->alpha_reinit);
 			}
 			double integ_val = BBFE_std_integ_calc(
 					np, val_ip, basis->integ_weight, Jacobian_ip);

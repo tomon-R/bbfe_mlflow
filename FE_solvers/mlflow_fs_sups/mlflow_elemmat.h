@@ -43,11 +43,13 @@ void BBFE_elemmat_vec_surface_tension(
 
 double BBFE_elemmat_vec_levelset_reinitialize(
 		const double N_i,
+		const double grad_N_i[3],
 		const double phi,
 		const double phi_zero,
 		const double grad_phi[3],
 		const double dt,
-		const double epsilon);
+		const double epsilon,
+		const double alpha);
 
 double BBFE_elemmat_mat_CLSM_reinitialize(
 		const double N_i,

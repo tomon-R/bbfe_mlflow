@@ -161,13 +161,15 @@ void BBFE_elemmat_vec_surface_tension(
  **********************************************************/
 double BBFE_elemmat_vec_levelset_reinitialize(
 		const double N_i,
+		const double grad_N_i[3],
 		const double phi,
-		const double phi_tmp,
+		const double phi_zero,
 		const double grad_phi[3],
 		const double dt,
-		const double epsilon)
+		const double epsilon,
+		const double alpha)
 {
-	double sign = phi_tmp / sqrt(phi_tmp * phi_tmp + epsilon * epsilon);
+	double sign = phi_zero / sqrt(phi_zero * phi_zero + epsilon * epsilon);
 	double l_n = BB_calc_vec3d_length(grad_phi);
 	double w_vec_grad_phi;
 	if( l_n < ZERO_CRITERION){
@@ -182,6 +184,7 @@ double BBFE_elemmat_vec_levelset_reinitialize(
 	//val += - N_i * w_vec_grad_phi * dt;
 	//val += N_i * sign * dt;
 	val += N_i * (sign * (1 - l_n)) * dt;
+	val -= alpha * BB_calc_vec3d_dot(grad_phi, grad_N_i);
 
 	return val;
 }
