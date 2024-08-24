@@ -73,53 +73,55 @@ $ #cond.datファイルは最初から準備されているか、なければ自
 ### 解析条件入力ファイル(cond.dat)
 
 ```plaintext
-#num_ip_each_axis 1   # 数値積分の1辺の積分点数
+#num_ip_each_axis 1    数値積分の1辺の積分点数
 2                        
-#mat_epsilon 1        # 線形ソルバーの反復法の許容誤差
+#mat_epsilon 1         線形ソルバーの反復法の許容誤差
 1.000000000000000e-08    
-#mat_max_iter 1       # 線形ソルバーの最大反復回数
+#mat_max_iter 1        線形ソルバーの最大反復回数
 10000                    
-#time_spacing 1       # 流体ソルバーの時間刻み幅
+#time_spacing 1        流体ソルバーの時間刻み幅
 0.001                    
-#finish_time 1        # 計算終了時間
+#finish_time 1         計算終了時間
 10                       
-#output_interval 1    # 結果ファイルを出力するステップ間隔
+#output_interval 1     結果ファイルを出力するステップ間隔
 100
-#density_l 1          # 液相の密度
+#density_l 1           液相の密度
 1000
-#density_g 1          # 気相の密度
+#density_g 1           気相の密度
 1.2
-#viscosity_l 1        # 液相の粘性係数
+#viscosity_l 1         液相の粘性係数
 1.0e-3
-#viscosity_g 1        # 気相の粘性係数
+#viscosity_g 1         気相の粘性係数
 1.8e-5
-#gravity 3            # 重力加速度ベクトル
+#gravity 3             重力加速度ベクトル
 0.0
 0.0
 -9.8
-#size_interface 1     # 界面厚さ
+#size_interface 1      界面厚さ
 0.1
-#surf_tension_coef 1  # 表面張力係数
+#surf_tension_coef 1   表面張力係数
 0
-#dt_reinit 1          # レベルセット関数の再初期化計算の時間刻み幅dt
+#dt_reinit 1           レベルセット関数の再初期化計算の時間刻み幅dt
 1e-4
-#epsilon_reinit 1     # レベルセット関数の再初期化計算のパラメータ（sgn(phi)を近似するパラメータ）
+#epsilon_reinit 1      レベルセット関数の再初期化計算のパラメータ（sgn(phi)を近似するパラメータ）
 0.1
-#delta_reinit 1       # レベルセット関数の再初期化計算の収束判定値
+#delta_reinit 1        レベルセット関数の再初期化計算の収束判定値
 1e-4
-#max_iter_reinit      # レベルセット関数の再初期化の最大反復回数
+#alpha_reinit 1        レベルセット関数の再初期化計算の安定化項の係数 
+1e-7
+#max_iter_reinit       レベルセット関数の再初期化の最大反復回数
 5
-#accel_amp 3          # 慣性加速度ベクトルの振幅
+#accel_amp 3           慣性加速度ベクトルの振幅
 0.0093
 0
 0
-#accel_angle_vel 3    # 慣性加速度ベクトルの角速度
+#accel_angle_vel 3     慣性加速度ベクトルの角速度
 5.311
 0
 0
-#output_option 1      # ベンチマークの計測ファイルを出力するオプション（1:ダムブレイク、2:気泡上昇流れ、3:スロッシング）
+#output_option 1       ベンチマークの計測ファイルを出力するオプション（1:ダムブレイク、2:気泡上昇流れ、3:スロッシング）
 3
-#ale_option 1         # ALE法でメッシュを移動させるかどうかのオプション (0:メッシュ移動させない、1:メッシュ移動させる)
+#ale_option 1          ALE法でメッシュを移動させるかどうかのオプション (0:メッシュ移動させない、1:メッシュ移動させる)
 0
 ```
 
@@ -164,9 +166,6 @@ $ cd ./util/workspace
 $ ./input_generator_dambreak_allnoslip.sh 40 6 40 0.584 0.0876 0.584
 ```
 
-#### 解析結果
-![dambreak-result](./docs/mlflow_manual/pics/3d-dambreak/result.gif)
-
 ### 気泡上昇流れ
 #### 入力ファイルの準備
 ```shell
@@ -174,15 +173,9 @@ $ cd ./util/workspace
 $ ./input_generator_3d_bubble_allnoslip.sh 40 40 80 1 1 2
 ```
 
-#### 解析結果
-![bubble-result-tc1](./docs/mlflow_manual/pics/3d-bubble/tc1/result.gif)
-
 ### スロッシング
 #### 入力ファイルの準備
 ```shell
 $ cd ./util/workspace
 $ input_generator_sloshing_allnoslip.sh 40 8 48 1.0 0.2 1.2
 ```
-
-#### 解析結果
-![sloshing-result](./docs/mlflow_manual/pics/3d-sloshing/CN-dx0025/result.gif)
