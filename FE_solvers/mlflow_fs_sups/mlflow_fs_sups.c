@@ -1070,6 +1070,9 @@ void reinit_levelset(
 	int step = 0;
 	double error = 1.0e10;
 
+	double* r;
+	r = BB_std_calloc_1d_double(r, sys->fe.total_num_nodes);
+
 	for(int i=0; i<sys->fe.total_num_nodes; i++){
 		sys->vals.levelset_tmp[i] = sys->vals.levelset[i];
 	}
@@ -1100,16 +1103,26 @@ void reinit_levelset(
 					sys->vals.mat_max_iter,
 					sys->vals.mat_epsilon);
 
-		error = 0;
 		for(int i=0; i<(sys->fe.total_num_nodes); i++) {
 			// Residual
-			error += (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]) * (sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i]);
+			r[i] = sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i];
 			// Update levelset value
 			sys->vals.levelset[i] = sys->mono_reinit.mat.R.X[i];
 		}
+
+		monolis_inner_product_R(
+					&(sys->mono_reinit),
+					&(sys->mono_com),
+					1,
+					r,
+					r,
+					&error);
+
 		printf("Reinitialization Step: %d\n", step);
 		printf("Error: %f, Delta: %f\n", sqrt(error)/sys->vals.dt_reinit, sys->vals.delta_reinit);
 	}
+
+	BB_std_free_1d_double(r, sys->fe.total_num_nodes);
 }
 
 /**********************************************************
@@ -1380,7 +1393,14 @@ void BBFE_mlflow_volume_correction(
 	double* levelset_ip;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
 
+	bool* is_internal_elem;
+	is_internal_elem = BB_std_calloc_1d_bool(is_internal_elem, fe->total_num_elems);
+	monolis_get_bool_list_of_internal_simple_mesh(monolis_com, fe->total_num_nodes, fe->total_num_elems,
+		fe->local_num_nodes, fe->conn, is_internal_elem);
+
 	for(int e=0; e<(fe->total_num_elems); e++) {
+		if (!is_internal_elem[e]) continue;
+
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
 
 		double vol = BBFE_std_integ_calc_volume(
@@ -1462,6 +1482,8 @@ void BBFE_mlflow_volume_correction(
 
 	BB_std_free_1d_double(local_levelset, nl);
 	BB_std_free_1d_double(levelset_ip, np);
+
+	BB_std_free_1d_bool(is_internal_elem, fe->total_num_elems);
 }
 
 int main(
@@ -1596,7 +1618,6 @@ int main(
 				&(sys.fe),
 				&(sys.basis),
 				&(sys.vals));
-
 		BBFE_sys_monowrap_set_Dirichlet_bc(
 				&(sys.monolis),
 				sys.fe.total_num_nodes,
