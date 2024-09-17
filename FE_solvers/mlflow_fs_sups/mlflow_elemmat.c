@@ -139,7 +139,11 @@ void BBFE_elemmat_vec_surface_tension(
 		delta = 0;
 	}
 	for(int d=0; d<3; d++) {
-	   	surf_tension_vec[d] = sigma * kappa * grad_phi[d] / l_n * delta;
+		if( l_n < ZERO_CRITERION){
+			surf_tension_vec[d] = 0;
+		}else{
+			surf_tension_vec[d] = sigma * kappa * grad_phi[d] / l_n * delta;;
+		}
 	}
 	//*/
 
@@ -151,7 +155,11 @@ void BBFE_elemmat_vec_surface_tension(
 		delta = 0;
 	}
 	for(int d=0; d<3; d++) {
-	   	surf_tension_vec[d] = sigma * kappa * grad_phi[d] / l_n * delta;
+		if( l_n < ZERO_CRITERION){
+			surf_tension_vec[d] = 0;
+		}else{
+	   		surf_tension_vec[d] = sigma * kappa * grad_phi[d] / l_n * delta;
+	   	}
 	}
 	//*/
 }
@@ -169,7 +177,14 @@ double BBFE_elemmat_vec_levelset_reinitialize(
 		const double epsilon,
 		const double alpha)
 {
-	double sign = phi_zero / sqrt(phi_zero * phi_zero + epsilon * epsilon);
+	double tmp = sqrt(phi_zero * phi_zero + epsilon * epsilon);
+	double sign;
+	if( tmp < ZERO_CRITERION){
+		sign = 0;
+	}else{
+		sign = phi_zero / tmp;
+	}
+	//double sign = phi_zero / sqrt(phi_zero * phi_zero + epsilon * epsilon);
 	double l_n = BB_calc_vec3d_length(grad_phi);
 	double w_vec_grad_phi;
 	if( l_n < ZERO_CRITERION){
@@ -207,7 +222,11 @@ double BBFE_elemmat_mat_CLSM_reinitialize(
 	double* n_vec;
 	n_vec = BB_std_calloc_1d_double(n_vec, 3);
 	for(int d=0; d<3; d++){
-		n_vec[d] = grad_phi[d]/l_n;
+		if( l_n < ZERO_CRITERION){
+			n_vec[d] = 0;
+		}else{
+			n_vec[d] = grad_phi[d]/l_n;
+		}
 	}
 
 	double val = 0.0;
