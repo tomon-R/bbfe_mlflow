@@ -32,21 +32,18 @@ void output_result_dambreak_data(
 		const char* directory,
 		double time)
 {
-	char filename[BUFFER_SIZE];
-	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_DAMBREAK);
-
 	FILE* fp;
-	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
+	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_DAMBREAK, directory);
 
 	int cnt_bottom = 0;
 	int cnt_height = 0;
 
 	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][2] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+		if(fabs(fe->x[i][2] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
 			// (y,z)=(0,0)
 			cnt_bottom++;
 		}
-		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+		if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
 			// (x,y)=(0,0)
 			cnt_height++;
 		}
@@ -66,7 +63,7 @@ void output_result_dambreak_data(
 	int id_z = 0;
 
 	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][2] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+		if(fabs(fe->x[i][2] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
 			// (y,z)=(0,0)
 			x[id_x] = fe->x[i][0];
 			phi_x[id_x] = levelset[i];
@@ -74,7 +71,7 @@ void output_result_dambreak_data(
 			pairs_x[id_x].value = phi_x[id_x];
 			id_x++;
 		}
-		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+		if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
 			// (x,y)=(0,0)
 			z[id_z] = fe->x[i][2];
 			phi_z[id_z] = levelset[i];
@@ -87,7 +84,7 @@ void output_result_dambreak_data(
 	qsort(pairs_x, cnt_bottom, sizeof(Pair), compare);
 	qsort(pairs_z, cnt_height, sizeof(Pair), compare);
 
-	if(abs(time-0.0)<EPS){
+	if(fabs(time-0.0)<EPS){
 		fprintf(fp, "%s, %s, %s, \n", "Time", "x", "z");
 	}
 	fprintf(fp, "%lf, ", time);
@@ -104,7 +101,7 @@ void output_result_dambreak_data(
 			//fprintf(fp, "%lf, %lf\n", x1, p1);
 			fprintf(fp, "%lf, ", x_zero);
 			//fprintf(fp, "%lf, %lf\n", x2, p2);
-		}else if(abs(pairs_x[i].value)<EPS){
+		}else if(fabs(pairs_x[i].value)<EPS){
 			fprintf(fp, "%lf, ", pairs_x[i].key);
 		}
 	}
@@ -121,7 +118,7 @@ void output_result_dambreak_data(
 			//fprintf(fp, "%lf, %lf\n", z1, p1);
 			fprintf(fp, "%lf\n", z_zero);
 			//fprintf(fp, "%lf, %lf\n", z2, p2);
-		}else if(abs(pairs_z[i].value)<EPS){
+		}else if(fabs(pairs_z[i].value)<EPS){
 			fprintf(fp, "%lf\n", pairs_z[i].key);
 		}
 	}
@@ -245,8 +242,6 @@ void output_result_bubble_data(
 		const char* directory,
 		double time)
 {
-	char filename[BUFFER_SIZE];
-	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_BUBBLE);
 	double* data = BB_std_calloc_1d_double(data, 4);
 	int myrank = monolis_mpi_get_global_my_rank();
 
@@ -254,8 +249,8 @@ void output_result_bubble_data(
 
 	if(myrank == 0){
 		FILE* fp;
-		fp = BBFE_sys_write_add_fopen(fp, filename, directory);
-		if(abs(time-0.0)<EPS){
+		fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_BUBBLE, directory);
+		if(fabs(time-0.0)<EPS){
 			fprintf(fp, "%s, %s, %s, %s, %s\n", "Time", "z", "vz", "sphericity", "size");
 		}
 		fprintf(fp, "%lf, %lf, %lf, %lf, %lf\n", time, data[0], data[1], data[2], data[3]);
@@ -274,7 +269,7 @@ int count_mlflow_measurement_node(
 {
 	int num_nodes = 0;
 	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+		if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
 			// (x,y)=(0,0)
 			num_nodes += 1;
 		}
@@ -288,7 +283,7 @@ void set_mlflow_measurement_node(
 {
     int mnid = 0;
 	for(int i=0; i<fe->total_num_nodes; i++){
-		if(abs(fe->x[i][0] - 0.0) < EPS && abs(fe->x[i][1] - 0.0) < EPS){
+		if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
 			// (x,y)=(0,0)
 			measurement_node_id[mnid] = i;
 			mnid += 1;
@@ -304,8 +299,6 @@ void output_result_sloshing_data(
 		int  num_nodes,
 		double time)
 {
-	char filename[BUFFER_SIZE];
-	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_SLOSHING);
 	int myrank = monolis_mpi_get_global_my_rank();
 
 	double* z     = BB_std_calloc_1d_double(z, num_nodes);
@@ -328,10 +321,10 @@ void output_result_sloshing_data(
 	qsort(pairs_z, num_nodes, sizeof(Pair), compare);
 
 	FILE* fp;
-	fp = BBFE_sys_write_add_fopen(fp, filename, directory);
+	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_SLOSHING, directory);
 
 	if(myrank == 0){
-		if(abs(time-0.0)<EPS){
+		if(fabs(time-0.0)<EPS){
 			fprintf(fp, "%s, %s, \n", "Time", "z");
 		}
 	}
@@ -347,7 +340,7 @@ void output_result_sloshing_data(
 			fprintf(fp, "%lf, ", time);
 			fprintf(fp, "%lf\n", z_zero);
 
-		}else if(abs(pairs_z[i].value)<EPS){
+		}else if(fabs(pairs_z[i].value)<EPS){
 			//fprintf(fp, "%lf, ", time);
 			//fprintf(fp, "%lf\n", pairs_z[i].key);
 		}

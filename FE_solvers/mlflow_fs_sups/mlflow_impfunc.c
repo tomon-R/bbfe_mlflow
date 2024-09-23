@@ -103,3 +103,14 @@ void BBFE_mlflow_renew_mesh_position(
 		}
 	}
 }
+
+void BBFE_mlflow_clear_surface_tension(
+		double** surf_tension,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++){
+		surf_tension[i][0] = 0;
+		surf_tension[i][1] = 0;
+		surf_tension[i][2] = 0;
+	}
+}

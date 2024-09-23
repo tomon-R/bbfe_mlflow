@@ -133,7 +133,7 @@ void BBFE_elemmat_vec_surface_tension(
 	}
 	
 	//* Conventional LSM
-	if(abs(phi) <= alpha){
+	if(fabs(phi) <= alpha){
 		delta = (1 + cos(M_PI*phi/alpha))/(2*alpha);
 	}else{
 		delta = 0;
@@ -149,7 +149,7 @@ void BBFE_elemmat_vec_surface_tension(
 
 	/* CLSM
 	double dist = log(1.0/phi-1) * size_interface;
-	if(abs(dist) <= alpha){
+	if(fabs(dist) <= alpha){
 		delta = (1 + cos(M_PI*dist/alpha))/(2*alpha);
 	}else{
 		delta = 0;
@@ -225,7 +225,7 @@ double BBFE_elemmat_mat_CLSM_reinitialize(
 		if( l_n < ZERO_CRITERION){
 			n_vec[d] = 0;
 		}else{
-			n_vec[d] = grad_phi[d]/l_n;
+			n_vec[d] = grad_phi[d] / l_n;
 		}
 	}
 
@@ -236,7 +236,7 @@ double BBFE_elemmat_mat_CLSM_reinitialize(
 	val += epsilon * BB_calc_vec3d_dot(grad_N_j, n_vec) * 0.5 * BB_calc_vec3d_dot(grad_N_i, n_vec) * dt;
 
 	BB_std_free_1d_double(n_vec, 3);
-	//if(abs(val)>ZERO_CRITERION)printf("CLSM mat val: %f\n", val);
+	//if(fabs(val)>ZERO_CRITERION)printf("CLSM mat val: %f\n", val);
 	return val;
 }
 
@@ -256,7 +256,11 @@ double BBFE_elemmat_vec_CLSM_reinitialize(
 	double* n_vec;
 	n_vec = BB_std_calloc_1d_double(n_vec, 3);
 	for(int d=0; d<3; d++){
-		n_vec[d] = normal_vec[d]/l_n;
+		if(l_n < ZERO_CRITERION){
+			n_vec[d] = 0;
+		}else{
+			n_vec[d] = normal_vec[d] / l_n;
+		}
 	}
 
 	double val = 0.0;
@@ -266,7 +270,7 @@ double BBFE_elemmat_vec_CLSM_reinitialize(
 	val -= epsilon * BB_calc_vec3d_dot(grad_phi, n_vec) * 0.5 * BB_calc_vec3d_dot(grad_N_i, n_vec) * dt;
 
 	BB_std_free_1d_double(n_vec, 3);
-	//if(abs(val)>ZERO_CRITERION)printf("CLSM vec val: %f\n", val);
+	//if(fabs(val)>ZERO_CRITERION)printf("CLSM vec val: %f\n", val);
 	return val;
 }
 

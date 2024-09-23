@@ -317,7 +317,7 @@ void read_levelset_file(
 {
 	FILE* fp;
 	fp = BBFE_sys_read_fopen(fp, filename, directory);
-	char* label[256];
+	char label[256];
 	int num;
 
 	// read label
@@ -1422,7 +1422,7 @@ void BBFE_mlflow_volume_correction(
 
 				vol_g_ip[p] = basis->N[p][i] *  (0.5 - heaviside_ip[p]);
 
-				if(abs(levelset_ip[p]) <= alpha){
+				if(fabs(levelset_ip[p]) <= alpha){
 					delta = (1 + cos(M_PI*levelset_ip[p]/alpha))/(2*alpha);
 				}else{
 					delta = 0;
@@ -1452,7 +1452,7 @@ void BBFE_mlflow_volume_correction(
 		vals->volume_g_init = vol_gas;
 		printf("Volume of gas at T=0: %lf\n", vals->volume_g_init);
 	}else if(step > 0){
-		printf("V_g(0): %lf, V_g(%d): %lf, V_g(%d)/V_g(0): %lf (%)\n", 
+		printf("V_g(0): %lf, V_g(%d): %lf, V_g(%d)/V_g(0): %lf (%%)\n", 
 			vals->volume_g_init, step, vol_gas, step, vol_gas/vals->volume_g_init*100);
 
 		for(int i=0; i<(fe->total_num_nodes); i++) {
@@ -1461,15 +1461,15 @@ void BBFE_mlflow_volume_correction(
 	}
 
 	// file output
-	char filename[BUFFER_SIZE];
-	snprintf(filename, BUFFER_SIZE, OUTPUT_FILENAME_VOLUME);
 	FILE* fp;
-	fp = BBFE_sys_write_add_fopen(fp, filename, cond->directory);
-	double eps = 1e-10;
-	if(step == 0){
-		fprintf(fp, "%s, %s, %s, %s\n", "Time", "V_g(t)", "V_g(0)", "V_g(t)/V_g(0)");
-	}else{
-		fprintf(fp, "%lf, %lf, %lf, %lf\n", step*vals->dt, vol_gas, vals->volume_g_init, vol_gas/vals->volume_g_init*100);
+	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_VOLUME, cond->directory);
+	int myrank = monolis_mpi_get_global_my_rank();
+	if(myrank == 0){
+		if(step == 0){
+			fprintf(fp, "%s, %s, %s, %s\n", "Time", "V_g(t)", "V_g(0)", "V_g(t)/V_g(0)");
+		}else{
+			fprintf(fp, "%lf, %lf, %lf, %lf\n", step*vals->dt, vol_gas, vals->volume_g_init, vol_gas/vals->volume_g_init*100);
+		}
 	}
 	fclose(fp);
 
@@ -1521,10 +1521,10 @@ int main(
 	BBFE_elemmat_set_Jacobi_mat(&(sys.fe), &(sys.basis));
 	BBFE_elemmat_set_shapefunc_derivative(&(sys.fe), &(sys.basis));
 	
-	BBFE_sys_monowrap_init_monomat(&(sys.monolis) , &(sys.mono_com), &(sys.fe), 4, sys.cond.directory);
-	BBFE_sys_monowrap_init_monomat(&(sys.mono_levelset)  , &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
-	BBFE_sys_monowrap_init_monomat(&(sys.mono_reinit)  , &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
-	BBFE_sys_monowrap_init_monomat(&(sys.mono_L2)  , &(sys.mono_com), &(sys.fe), 3, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.monolis),       &(sys.mono_com), &(sys.fe), 4, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_levelset), &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_reinit),   &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_L2),       &(sys.mono_com), &(sys.fe), 3, sys.cond.directory);
 
 	BBFE_elemmat_mat_L2projection(&(sys.mono_L2), &(sys.fe), &(sys.basis), 1.0, 3);
 
@@ -1558,11 +1558,7 @@ int main(
 		monolis_clear_mat_value_rhs_R(&(sys.mono_L2));
 
 		// Clear surface tension vector
-		for(int m=0;m<sys.fe.total_num_nodes;m++){
-			sys.vals.surf_tension[m][0] = 0;
-			sys.vals.surf_tension[m][1] = 0;
-			sys.vals.surf_tension[m][2] = 0;
-		}
+		BBFE_mlflow_clear_surface_tension(sys.vals.surf_tension, sys.fe.total_num_nodes);
 
 		// Update inertial acceleration
 		BBFE_mlflow_renew_acceleration(sys.vals.accel_inertia, sys.vals.accel_amp, sys.vals.accel_angle_vel, t);

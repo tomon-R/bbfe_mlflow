@@ -49,3 +49,7 @@ void BBFE_mlflow_renew_mesh_position(
 		double** v_mesh,
 		const int total_num_nodes,
 		const double dt);
+
+void BBFE_mlflow_clear_surface_tension(
+		double** surf_tension,
+		const int total_num_nodes);
