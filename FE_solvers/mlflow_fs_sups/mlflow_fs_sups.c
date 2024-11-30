@@ -315,7 +315,7 @@ void read_levelset_file(
 		const char*  filename,
 		const char*  directory)
 {
-	FILE* fp;
+	FILE* fp = NULL;
 	fp = BBFE_sys_read_fopen(fp, filename, directory);
 	char label[256];
 	int num;
@@ -346,10 +346,9 @@ void output_result_file_vtk(
 		BBFE_DATA*       fe,
 		VALUES*        vals,
 		const char*    filename,
-		const char*    directory,
-		double         t)
+		const char*    directory)
 {
-	FILE* fp;
+	FILE* fp = NULL;
 	fp = BBFE_sys_write_fopen(fp, filename, directory);
 	printf("total_num_nodes: %d\n", fe->total_num_nodes);
 
@@ -379,25 +378,21 @@ void output_result_file_vtk(
 
 void output_files(
 		FE_SYSTEM* sys,
-		int file_num,
-		double t)
+		int file_num)
 {
 	int myrank = monolis_mpi_get_global_my_rank();
 	char fname_vtk[BUFFER_SIZE];
 	snprintf(fname_vtk, BUFFER_SIZE, OUTPUT_FILENAME_VTK, myrank, file_num);
 
 	output_result_file_vtk(
-			&(sys->fe), &(sys->vals), fname_vtk, sys->cond.directory, t);
+			&(sys->fe), &(sys->vals), fname_vtk, sys->cond.directory);
 }
 
 void output_mlflow_data_files(
 		FE_SYSTEM* sys,
-		int file_num,
 		int step,
 		double t)
 {
-	int myrank = monolis_mpi_get_global_my_rank();
-	char fname_vtk[BUFFER_SIZE];
 	switch(sys->vals.output_option){
 		case 1:
 			output_result_dambreak_data(&(sys->fe), sys->vals.levelset, sys->cond.directory, t);
@@ -486,27 +481,27 @@ void set_element_mat(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double*** val_ip;  double* Jacobian_ip;
+	double*** val_ip = NULL;  double* Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_3d_double(val_ip     , 4 , 4, np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double** local_v;
+	double** local_v = NULL;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-	double** v_ip; 
+	double** v_ip = NULL; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
 
-	double** local_v_mesh;
+	double** local_v_mesh = NULL;
 	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
-	double** v_mesh_ip; 
+	double** v_mesh_ip = NULL; 
 	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
 
-	double* local_viscosity;
+	double* local_viscosity = NULL;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
-	double* local_density;
+	double* local_density = NULL;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
-	double* viscosity_ip;
+	double* viscosity_ip = NULL;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
-	double* density_ip;
+	double* density_ip = NULL;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
 
 	double A[4][4];
@@ -527,16 +522,14 @@ void set_element_mat(
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
 			BBFE_std_mapping_vector3d(v_mesh_ip[p], nl, local_v_mesh, basis->N[p]);
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
-			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);		
+			density_ip[p]   = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);		
 		}
 
 		for(int i=0; i<nl; i++) {
 			for(int j=0; j<nl; j++) {
 				for(int p=0; p<np; p++) {
-					double tau = BBFE_elemmat_fluid_sups_coef(
-							density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
-					double tau_c = BBFE_elemmat_mlflow_shock_capturing_coef(
-							density_ip[p], viscosity_ip[p], v_ip[p], h_e);
+					double tau   = BBFE_elemmat_fluid_sups_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+					double tau_c = BBFE_elemmat_mlflow_shock_capturing_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e);
 					//*
 					BBFE_elemmat_fluid_sups_mat(
 							A, basis->N[p][i], basis->N[p][j], 
@@ -595,42 +588,43 @@ void set_element_vec(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double** val_ip;
-	double*  Jacobian_ip;
+	double** val_ip = NULL;
+	double*  Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_2d_double(val_ip, 4, np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double** local_v;
+	double** local_v = NULL;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-	double** v_ip; 
+	double** v_ip = NULL; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
-	double*** grad_v_ip;
+	double*** grad_v_ip = NULL;
 	grad_v_ip = BB_std_calloc_3d_double(grad_v_ip, np, 3, 3);
 
-	double** local_v_mesh;
+	double** local_v_mesh = NULL;
 	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
-	double** v_mesh_ip; 
+	double** v_mesh_ip = NULL; 
 	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
 
-	double* local_viscosity;
+	double* local_viscosity = NULL;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
-	double* local_density;
+	double* local_density = NULL;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
-	double* local_levelset;
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double** local_grad_phi;
+	double** local_grad_phi = NULL;
 	local_grad_phi = BB_std_calloc_2d_double(local_grad_phi, nl, 3);
 
-	double* viscosity_ip;
+	double* viscosity_ip = NULL;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
-	double* density_ip;
+	double* density_ip = NULL;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
-	double** grad_phi_ip;
+	double** grad_phi_ip = NULL;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
-	double** surf_tension_ip; double** surf_tension_ip2;
+	double** surf_tension_ip = NULL; 
+	double** surf_tension_ip2 = NULL;
 	surf_tension_ip = BB_std_calloc_2d_double(val_ip, np, 3);
 	surf_tension_ip2 = BB_std_calloc_2d_double(val_ip, 3, np);
 
@@ -668,7 +662,7 @@ void set_element_vec(
 							density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
 				BBFE_elemmat_vec_surface_tension(
-						basis->N[p][i], fe->geo[e][p].grad_N[i], levelset_ip[p], grad_phi_ip[p], 
+						fe->geo[e][p].grad_N[i], levelset_ip[p], grad_phi_ip[p], 
 						vals->surf_tension_coef, surf_tension_ip[p], vals->size_interface);
 
 				double vec[4];
@@ -740,27 +734,27 @@ void set_element_mat_levelset(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double* val_ip;  double* Jacobian_ip;
+	double* val_ip = NULL;  double* Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double** local_v;
+	double** local_v = NULL;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-	double** v_ip; 
+	double** v_ip = NULL; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
 
-	double** local_v_mesh;
+	double** local_v_mesh = NULL;
 	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
-	double** v_mesh_ip; 
+	double** v_mesh_ip = NULL; 
 	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
 
-	double* local_viscosity;
+	double* local_viscosity = NULL;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
-	double* local_density;
+	double* local_density = NULL;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
-	double* viscosity_ip;
+	double* viscosity_ip = NULL;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
-	double* density_ip;
+	double* density_ip = NULL;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
@@ -788,7 +782,7 @@ void set_element_mat_levelset(
 				for(int p=0; p<np; p++) {
 					val_ip[p] = 0.0;
 
-					double tau = elemmat_supg_coef_ml(v_ip[p], h_e, vals->dt);
+					double tau = elemmat_supg_coef_ml(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
 					val_ip[p] = BBFE_elemmat_mat_levelset(
 							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau, v_mesh_ip[p]);
@@ -826,37 +820,37 @@ void set_element_vec_levelset(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double*  val_ip;
-	double*  Jacobian_ip;
+	double*  val_ip = NULL;
+	double*  Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double** local_v;
+	double** local_v = NULL;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-	double** v_ip; 
+	double** v_ip = NULL; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
 
-	double** local_v_mesh;
+	double** local_v_mesh = NULL;
 	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
-	double** v_mesh_ip; 
+	double** v_mesh_ip = NULL; 
 	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
 
-	double* local_levelset;
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double* local_viscosity;
+	double* local_viscosity = NULL;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
-	double* local_density;
+	double* local_density = NULL;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
-	double* viscosity_ip;
+	double* viscosity_ip = NULL;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
-	double* density_ip;
+	double* density_ip = NULL;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
-	double** grad_phi_ip;
+	double** grad_phi_ip = NULL;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
-	double*** grad_v_ip;
+	double*** grad_v_ip = NULL;
 	grad_v_ip = BB_std_calloc_3d_double(grad_v_ip, np, 3, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
@@ -887,17 +881,13 @@ void set_element_vec_levelset(
 
 		for(int i=0; i<nl; i++) {
 			for(int p=0; p<np; p++) {
-				double tau_supg_ml = elemmat_supg_coef_ml(v_ip[p], h_e, vals->dt);
+				double tau_supg_ml = elemmat_supg_coef_ml(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 				double tau_lsic    = elemmat_lsic_coef(h_e, v_ip[p]);
 
-				double vec[3];
 				val_ip[p] = BBFE_elemmat_vec_levelset(
-					vec, 
 					basis->N[p][i], fe->geo[e][p].grad_N[i], 
-					v_ip[p], grad_v_ip[p],
-					levelset_ip[p], grad_phi_ip[p],
-					density_ip[p], viscosity_ip[p], tau_supg_ml, tau_lsic, vals->dt,
-					v_mesh_ip[p]);
+					v_ip[p],levelset_ip[p], grad_phi_ip[p],
+					tau_supg_ml, tau_lsic, vals->dt, v_mesh_ip[p]);
 			}
 			double integ_val = BBFE_std_integ_calc(
 					np, val_ip, basis->integ_weight, Jacobian_ip);
@@ -936,24 +926,20 @@ void set_element_vec_L2_projection(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double** val_ip;
+	double** val_ip = NULL;
 	val_ip      = BB_std_calloc_2d_double(val_ip, 3, np);
-	double*  Jacobian_ip;
+	double*  Jacobian_ip = NULL;
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double* local_levelset;
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
-	double** grad_phi_ip;
+	double** grad_phi_ip = NULL;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
-
-		double vol = BBFE_std_integ_calc_volume(
-				np, basis->integ_weight, Jacobian_ip);
-		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
 
@@ -1004,23 +990,23 @@ void set_element_vec_levelset_reinitialize(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double* val_ip;  double* Jacobian_ip;
+	double* val_ip = NULL;  double* Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double* local_levelset;
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
 
-	double* local_levelset_tmp;
+	double* local_levelset_tmp = NULL;
 	local_levelset_tmp = BB_std_calloc_1d_double(local_levelset_tmp, nl);
-	double* levelset_ip_tmp;
+	double* levelset_ip_tmp = NULL;
 	levelset_ip_tmp = BB_std_calloc_1d_double(levelset_ip_tmp, np);
 
-	double** local_grad_phi;
+	double** local_grad_phi = NULL;
 	local_grad_phi = BB_std_calloc_2d_double(local_grad_phi, nl, 3);
-	double** grad_phi_ip;
+	double** grad_phi_ip = NULL;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
@@ -1070,7 +1056,7 @@ void reinit_levelset(
 	int step = 0;
 	double error = 1.0e10;
 
-	double* r;
+	double* r = NULL;
 	r = BB_std_calloc_1d_double(r, sys->fe.total_num_nodes);
 
 	for(int i=0; i<sys->fe.total_num_nodes; i++){
@@ -1137,25 +1123,22 @@ void set_element_mat_CLSM_reinitialize(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double* val_ip;  double* Jacobian_ip;
+	double* val_ip = NULL;  double* Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double* local_levelset;
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
 
-	double** local_grad_phi;
+	double** local_grad_phi = NULL;
 	local_grad_phi = BB_std_calloc_2d_double(local_grad_phi, nl, 3);
-	double** grad_phi_ip;
+	double** grad_phi_ip = NULL;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
-
-		double vol = BBFE_std_integ_calc_volume(np, basis->integ_weight, Jacobian_ip);
-		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
 		BBFE_elemmat_set_local_array_vector(local_grad_phi, fe, vals->grad_phi, e, 3);
@@ -1204,28 +1187,25 @@ void set_element_vec_CLSM_reinitialize(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double* val_ip;  double* Jacobian_ip;
+	double* val_ip = NULL;  double* Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double* local_levelset;
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
 
-	double** local_normal_vec;
+	double** local_normal_vec = NULL;
 	local_normal_vec = BB_std_calloc_2d_double(local_normal_vec, nl, 3);
-	double** normal_vec_ip;
+	double** normal_vec_ip = NULL;
 	normal_vec_ip = BB_std_calloc_2d_double(normal_vec_ip, np, 3);
 
-	double** grad_phi_ip;
+	double** grad_phi_ip = NULL;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
-
-		double vol = BBFE_std_integ_calc_volume(np, basis->integ_weight, Jacobian_ip);
-		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
 		BBFE_elemmat_set_local_array_vector(local_normal_vec, fe, vals->grad_phi, e, 3);
@@ -1238,7 +1218,6 @@ void set_element_vec_CLSM_reinitialize(
 
 		for(int i=0; i<nl; i++) {
 			for(int p=0; p<np; p++) {
-				double vec[3];
 				val_ip[p] = BBFE_elemmat_vec_CLSM_reinitialize(
 					basis->N[p][i],
 					fe->geo[e][p].grad_N[i],
@@ -1260,7 +1239,6 @@ void set_element_vec_CLSM_reinitialize(
 	BB_std_free_2d_double(local_normal_vec, nl, 3);
 	BB_std_free_2d_double(normal_vec_ip, np, 3);
 
-	//BB_std_free_2d_double(local_grad_phi, nl, 3);
 	BB_std_free_2d_double(grad_phi_ip, np, 3);
 }
 
@@ -1323,7 +1301,7 @@ void BBFE_elemmat_mat_L2projection(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double* val_ip;  double* Jacobian_ip;
+	double* val_ip = NULL;  double* Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
@@ -1376,24 +1354,24 @@ void BBFE_mlflow_volume_correction(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double*  vol_g_ip;
-	double*  vol_i_ip;
-	double*  Jacobian_ip;
+	double*  vol_g_ip = NULL;
+	double*  vol_i_ip = NULL;
+	double*  Jacobian_ip = NULL;
 	vol_g_ip      = BB_std_calloc_1d_double(vol_g_ip     , np);
 	vol_i_ip      = BB_std_calloc_1d_double(vol_i_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double* local_heaviside;
+	double* local_heaviside = NULL;
 	local_heaviside = BB_std_calloc_1d_double(local_heaviside, nl);
-	double* heaviside_ip;
+	double* heaviside_ip = NULL;
 	heaviside_ip = BB_std_calloc_1d_double(heaviside_ip, np);
 
-	double* local_levelset;
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
 
-	bool* is_internal_elem;
+	bool* is_internal_elem = NULL;
 	is_internal_elem = BB_std_calloc_1d_bool(is_internal_elem, fe->total_num_elems);
 	monolis_get_bool_list_of_internal_simple_mesh(monolis_com, fe->total_num_nodes, fe->total_num_elems,
 		fe->local_num_nodes, fe->conn, is_internal_elem);
@@ -1402,10 +1380,6 @@ void BBFE_mlflow_volume_correction(
 		if (!is_internal_elem[e]) continue;
 
 		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
-
-		double vol = BBFE_std_integ_calc_volume(
-				np, basis->integ_weight, Jacobian_ip);
-		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_scalar(local_heaviside, fe, vals->heaviside, e);
 		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
@@ -1461,7 +1435,7 @@ void BBFE_mlflow_volume_correction(
 	}
 
 	// file output
-	FILE* fp;
+	FILE* fp = NULL;
 	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_VOLUME, cond->directory);
 	int myrank = monolis_mpi_get_global_my_rank();
 	if(myrank == 0){
@@ -1539,8 +1513,8 @@ int main(
 	int file_num = 0;
 
 	// Output files at t=0
-	output_files(&sys, file_num, t);
-	output_mlflow_data_files(&sys, file_num+1, step, t);
+	output_files(&sys, file_num);
+	output_mlflow_data_files(&sys, step, t);
 
 	// Calculate initial volume of gas at t=0
 	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), &(sys.cond), step);
@@ -1649,7 +1623,7 @@ int main(
 				&(sys.mono_com),
 				sys.mono_levelset.mat.R.X,
 				MONOLIS_ITER_BICGSTAB,
-				MONOLIS_PREC_SOR,
+				MONOLIS_PREC_DIAG,
 				sys.vals.mat_max_iter,
 				sys.vals.mat_epsilon);
 
@@ -1669,7 +1643,7 @@ int main(
 				&(sys.mono_com),
 				sys.mono_L2.mat.R.X,
 				MONOLIS_ITER_BICGSTAB,
-				MONOLIS_PREC_SOR,
+				MONOLIS_PREC_DIAG,
 				sys.vals.mat_max_iter,
 				sys.vals.mat_epsilon);
 		BBFE_fluid_renew_velocity(
@@ -1690,17 +1664,16 @@ int main(
 		}
 
 		/**************** Output result files  ****************/
-		output_mlflow_data_files(&sys, file_num+1, step, t);
+		output_mlflow_data_files(&sys, step, t);
 
 		if(step%sys.vals.output_interval == 0) {
 
 			BBFE_fluid_sups_renew_pressure(
 				sys.vals.p,
 				sys.monolis.mat.R.X,
-				sys.vals.density,
 				sys.fe.total_num_nodes);
 
-			output_files(&sys, file_num+1, t);
+			output_files(&sys, file_num+1);
 
 			file_num += 1;
 		}
