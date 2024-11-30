@@ -68,5 +68,4 @@ void BBFE_fluid_sups_renew_velocity(
 void BBFE_fluid_sups_renew_pressure(
 		double*   p,
 		double*   ans_vec,
-		double*   density,
 		const int total_num_nodes);
