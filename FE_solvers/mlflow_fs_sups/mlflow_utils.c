@@ -32,7 +32,7 @@ void output_result_dambreak_data(
 		const char* directory,
 		double time)
 {
-	FILE* fp;
+	FILE* fp = NULL;
 	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_DAMBREAK, directory);
 
 	int cnt_bottom = 0;
@@ -49,10 +49,15 @@ void output_result_dambreak_data(
 		}
 	}
 
-	double* x = BB_std_calloc_1d_double(x, cnt_bottom);
-	double* phi_x = BB_std_calloc_1d_double(phi_x, cnt_bottom);
-	double* z = BB_std_calloc_1d_double(z, cnt_height);
-	double* phi_z = BB_std_calloc_1d_double(phi_z, cnt_height);
+	double* x = NULL;
+	double* phi_x = NULL;
+	double* z = NULL;
+	double* phi_z  = NULL;
+		x = BB_std_calloc_1d_double(x, cnt_bottom);
+	phi_x = BB_std_calloc_1d_double(phi_x, cnt_bottom);
+		z = BB_std_calloc_1d_double(z, cnt_height);
+	phi_z = BB_std_calloc_1d_double(phi_z, cnt_height);
+	
 	Pair *pairs_x = (Pair*)malloc(cnt_bottom * sizeof(Pair));
 	Pair *pairs_z = (Pair*)malloc(cnt_height * sizeof(Pair));
     if (pairs_x == NULL || pairs_z == NULL) {
@@ -137,7 +142,7 @@ void output_result_dambreak_data(
 /**********************************************************
  * Output Rising Bubble Data
  **********************************************************/
-double calc_data_bubble(
+void calc_data_bubble(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis,
 		MONOLIS_COM* monolis_com,
@@ -152,36 +157,39 @@ double calc_data_bubble(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double*  vel_ip;
-	double*  pos_ip;
-	double*  vol_ip;
-	double*  Jacobian_ip;
+	double*  vel_ip = NULL;
+	double*  pos_ip = NULL;
+	double*  vol_ip = NULL;
+	double*  Jacobian_ip = NULL;
 	vel_ip      = BB_std_calloc_1d_double(vel_ip     , np);
 	pos_ip      = BB_std_calloc_1d_double(pos_ip     , np);
 	vol_ip      = BB_std_calloc_1d_double(vol_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double** local_v;
+	double** local_v = NULL;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-	double** v_ip; 
+	double** v_ip = NULL; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
 
-	double** local_x;
+	double** local_x = NULL;
 	local_x = BB_std_calloc_2d_double(local_x, nl, 3);
-	double** x_ip; 
+	double** x_ip = NULL; 
 	x_ip = BB_std_calloc_2d_double(x_ip, np, 3);
 
-	double* local_heaviside;
+	double* local_heaviside = NULL;
 	local_heaviside = BB_std_calloc_1d_double(local_heaviside, nl);
-	double* heaviside_ip;
+	double* heaviside_ip = NULL;
 	heaviside_ip = BB_std_calloc_1d_double(heaviside_ip, np);
 
-	for(int e=0; e<(fe->total_num_elems); e++) {
-		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+	bool* is_internal_elem = NULL;
+	is_internal_elem = BB_std_calloc_1d_bool(is_internal_elem, fe->total_num_elems);
+	monolis_get_bool_list_of_internal_simple_mesh(monolis_com, fe->total_num_nodes, fe->total_num_elems,
+		fe->local_num_nodes, fe->conn, is_internal_elem);
 
-		double vol = BBFE_std_integ_calc_volume(
-				np, basis->integ_weight, Jacobian_ip);
-		double h_e = cbrt(vol);
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		if (!is_internal_elem[e]) continue;
+		
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
 
 		BBFE_elemmat_set_local_array_vector(local_v, fe, v, e, 3);
 		BBFE_elemmat_set_local_array_vector(local_x, fe, fe->x, e, 3);
@@ -242,13 +250,14 @@ void output_result_bubble_data(
 		const char* directory,
 		double time)
 {
-	double* data = BB_std_calloc_1d_double(data, 4);
+	double* data = NULL;
+	data = BB_std_calloc_1d_double(data, 4);
 	int myrank = monolis_mpi_get_global_my_rank();
 
 	calc_data_bubble(fe, basis, monolis_com, v, heaviside, data);
 
 	if(myrank == 0){
-		FILE* fp;
+		FILE* fp = NULL;
 		fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_BUBBLE, directory);
 		if(fabs(time-0.0)<EPS){
 			fprintf(fp, "%s, %s, %s, %s, %s\n", "Time", "z", "vz", "sphericity", "size");
@@ -301,8 +310,10 @@ void output_result_sloshing_data(
 {
 	int myrank = monolis_mpi_get_global_my_rank();
 
-	double* z     = BB_std_calloc_1d_double(z, num_nodes);
-	double* phi_z = BB_std_calloc_1d_double(phi_z, num_nodes);
+	double* z     = NULL;
+	double* phi_z = NULL;
+	z = BB_std_calloc_1d_double(z, num_nodes);
+	phi_z = BB_std_calloc_1d_double(phi_z, num_nodes);
 	Pair *pairs_z = (Pair*)malloc(num_nodes * sizeof(Pair));
     if (pairs_z == NULL) {
         printf("Memory allocation error\n");
@@ -320,7 +331,7 @@ void output_result_sloshing_data(
 
 	qsort(pairs_z, num_nodes, sizeof(Pair), compare);
 
-	FILE* fp;
+	FILE* fp = NULL;
 	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_SLOSHING, directory);
 
 	if(myrank == 0){

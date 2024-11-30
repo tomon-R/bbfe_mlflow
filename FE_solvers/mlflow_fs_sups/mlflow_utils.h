@@ -12,7 +12,7 @@ void output_result_dambreak_data(
 		const char* directory,
 		double time);
 
-double calc_data_bubble(
+void calc_data_bubble(
 		BBFE_DATA*   fe,
 		BBFE_BASIS*  basis,
 		MONOLIS_COM* monolis_com,
