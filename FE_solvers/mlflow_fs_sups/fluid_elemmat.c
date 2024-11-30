@@ -18,13 +18,13 @@ double elemmat_supg_coef(
 		const double h_e,
 		const double dt)
 {
-
 	double l_v = BB_calc_vec3d_length(v);
-	if( l_v < ZERO_CRITERION) { return 0.0; }
-
 	double nu = viscosity/density;
+
 	double denom = (2.0/dt)*(2.0/dt) + (2.0*l_v/h_e)*(2.0*l_v/h_e) 
-		+ (4.0*nu/(h_e*h_e))*(4.0*nu/(h_e*h_e));
+	+ (4.0*nu/(h_e*h_e))*(4.0*nu/(h_e*h_e));
+
+	if(fabs(denom) < ZERO_CRITERION) { return 0.0; }
 
 	double val = sqrt(1.0/denom);
 	return (val);
@@ -42,10 +42,12 @@ double BBFE_elemmat_fluid_sups_coef(
 		const double dt)
 {
 	double l_v = BB_calc_vec3d_length(v);
-
 	double nu = viscosity/density;
+
 	double denom = (2.0/dt)*(2.0/dt) + (2.0*l_v/h_e)*(2.0*l_v/h_e) 
-		+ (4.0*nu/(h_e*h_e))*(4.0*nu/(h_e*h_e));
+	+ (4.0*nu/(h_e*h_e))*(4.0*nu/(h_e*h_e));
+
+	if(fabs(denom) < ZERO_CRITERION) { return 0.0; }
 
 	double val = sqrt(1.0/denom);
 	return (val);
@@ -68,7 +70,7 @@ double BBFE_elemmat_mlflow_shock_capturing_coef(
 		xi = 1;
 	}
 	
-	double val = h_e / 2 * l_v * xi;
+	double val = (h_e/2) * l_v * xi;
 	return (val);
 }
 
@@ -86,59 +88,59 @@ void BBFE_elemmat_fluid_sups_mat(
 		const double   dt,
 		const double   v_mesh[3])
 {
-	double*  v_ale;
+	double*  v_ale = NULL;
 	v_ale = BB_std_calloc_1d_double(v_ale, 3);
 	for(int d=0; d<3; d++){
 		v_ale[d] = v[d] - v_mesh[d];
 	}
 
-	double M = density * N_i * N_j;
-	double A = dt * density * N_i * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double M = density * N_i * N_j / dt;
+	double A = density * N_i * BB_calc_vec3d_dot(v_ale, grad_N_j);
 
-	double G1 = - dt * grad_N_i[0] * N_j;
-	double G2 = - dt * grad_N_i[1] * N_j;
-	double G3 = - dt * grad_N_i[2] * N_j;
+	double G1 = - grad_N_i[0] * N_j;
+	double G2 = - grad_N_i[1] * N_j;
+	double G3 = - grad_N_i[2] * N_j;
 
-	double D_11 = dt * viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[0]*grad_N_j[0] );
-	double D_12 = dt * viscosity * grad_N_i[1] * grad_N_j[0];
-	double D_13 = dt * viscosity * grad_N_i[2] * grad_N_j[0];
-	double D_21 = dt * viscosity * grad_N_i[0] * grad_N_j[1];
-	double D_22 = dt * viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[1]*grad_N_j[1] );
-	double D_23 = dt * viscosity * grad_N_i[2] * grad_N_j[1];
-	double D_31 = dt * viscosity * grad_N_i[0] * grad_N_j[2];
-	double D_32 = dt * viscosity * grad_N_i[1] * grad_N_j[2];
-	double D_33 = dt * viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[2]*grad_N_j[2] );
+	double D_11 = viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[0]*grad_N_j[0] );
+	double D_12 = viscosity * grad_N_i[1] * grad_N_j[0];
+	double D_13 = viscosity * grad_N_i[2] * grad_N_j[0];
+	double D_21 = viscosity * grad_N_i[0] * grad_N_j[1];
+	double D_22 = viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[1]*grad_N_j[1] );
+	double D_23 = viscosity * grad_N_i[2] * grad_N_j[1];
+	double D_31 = viscosity * grad_N_i[0] * grad_N_j[2];
+	double D_32 = viscosity * grad_N_i[1] * grad_N_j[2];
+	double D_33 = viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[2]*grad_N_j[2] );
 
-	double C1 = dt * N_i * grad_N_j[0];
-	double C2 = dt * N_i * grad_N_j[1];
-	double C3 = dt * N_i * grad_N_j[2];
+	double C1 = N_i * grad_N_j[0];
+	double C2 = N_i * grad_N_j[1];
+	double C3 = N_i * grad_N_j[2];
 
 	//SUPG 項
-	double M_s = density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * N_j;
-	double A_s = dt * density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double M_s = density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * N_j / dt;
+	double A_s = density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * BB_calc_vec3d_dot(v_ale, grad_N_j);
 
-	double G_s1 = dt * tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[0];
-	double G_s2 = dt * tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[1];
-	double G_s3 = dt * tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[2];
+	double G_s1 = tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[0];
+	double G_s2 = tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[1];
+	double G_s3 = tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[2];
 
 	//PSPG 項
-	double M_p1 = tau * grad_N_i[0] * N_j;
-	double M_p2 = tau * grad_N_i[1] * N_j;
-	double M_p3 = tau * grad_N_i[2] * N_j;
+	double M_p1 = tau * grad_N_i[0] * N_j / dt;
+	double M_p2 = tau * grad_N_i[1] * N_j / dt;
+	double M_p3 = tau * grad_N_i[2] * N_j / dt;
 
-	double A_p1 = dt * tau * grad_N_i[0] * BB_calc_vec3d_dot(v_ale, grad_N_j);
-	double A_p2 = dt * tau * grad_N_i[1] * BB_calc_vec3d_dot(v_ale, grad_N_j);
-	double A_p3 = dt * tau * grad_N_i[2] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p1 = tau * grad_N_i[0] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p2 = tau * grad_N_i[1] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p3 = tau * grad_N_i[2] * BB_calc_vec3d_dot(v_ale, grad_N_j);
 
-	double G_p = dt * tau * (
+	double G_p = tau * (
 			grad_N_i[0] * grad_N_j[0] +
 			grad_N_i[1] * grad_N_j[1] +
 			grad_N_i[2] * grad_N_j[2]) / density;
 
 	//Shock Capturing項
-	double C_s1 = dt * density * tau_c * grad_N_i[0] * grad_N_j[0];
-	double C_s2 = dt * density * tau_c * grad_N_i[1] * grad_N_j[1];
-	double C_s3 = dt * density * tau_c * grad_N_i[2] * grad_N_j[2];
+	double C_s1 = density * tau_c * grad_N_i[0] * grad_N_j[0];
+	double C_s2 = density * tau_c * grad_N_i[1] * grad_N_j[1];
+	double C_s3 = density * tau_c * grad_N_i[2] * grad_N_j[2];
 
 	mat[0][0] = M + M_s + A + A_s + D_11 + C_s1;
 	mat[0][1] = D_12;
@@ -176,7 +178,7 @@ void BBFE_elemmat_fluid_sups_vec(
 		const int      ale_option
 		)
 {
-	double*  v_ale;
+	double*  v_ale = NULL;
 	v_ale = BB_std_calloc_1d_double(v_ale, 3);
 	for(int d=0; d<3; d++){
 		v_ale[d] = v[d] - v_mesh[d];
@@ -204,6 +206,9 @@ void BBFE_elemmat_fluid_sups_vec(
 
 	vec[3] = tau * BB_calc_vec3d_dot(grad_N_i, v);
 
+	for(int i=0; i<4; i++){
+		vec[i] /= dt;
+	}
 	BB_std_free_1d_double(v_ale, 3);
 }
 
@@ -225,7 +230,7 @@ void BBFE_elemmat_fluid_sups_mat_crank_nicolson(
 		const double   dt,
 		const double   v_mesh[3])
 {
-	double*  v_ale;
+	double*  v_ale = NULL;
 	v_ale = BB_std_calloc_1d_double(v_ale, 3);
 	for(int d=0; d<3; d++){
 		v_ale[d] = v[d] - v_mesh[d];
@@ -315,7 +320,7 @@ void BBFE_elemmat_fluid_sups_vec_crank_nicolson(
 		const double   v_mesh[3],
 		const int      ale_option)
 {
-	double*  v_ale;
+	double*  v_ale = NULL;
 	v_ale = BB_std_calloc_1d_double(v_ale, 3);
 	for(int d=0; d<3; d++){
 		v_ale[d] = v[d] - v_mesh[d];
