@@ -1,7 +1,7 @@
 CC = mpic++
 FC = mpif90
 
-CFLAGS = -g -O3
+CFLAGS = -g -O3 -Wall #-Wextra -Wshadow -Wformat=2 -Wfloat-equal -Wconversion -Wpointer-arith -Wpedantic -Wcast-align -fsanitize=address
 LDFLAGS =
 INCLUDES = -I/usr/local/include -I../../submodule/monolis/include
 LIBS = -L/usr/local/lib -lm -lstdc++ -L../../submodule/monolis/lib -lmonolis_solver -lgedatsu -lmonolis_utils -lmetis -llapack
