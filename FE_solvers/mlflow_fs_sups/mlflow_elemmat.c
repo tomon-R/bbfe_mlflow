@@ -11,14 +11,19 @@ const double ZERO_CRITERION  = 1.0e-10;
  * Stabilized FEM for levelset convection
  **********************************************************/
 double elemmat_supg_coef_ml(
+		const double density,
+		const double viscosity,
 		const double v[3],
 		const double h_e,
 		const double dt)
 {
 	double l_v = BB_calc_vec3d_length(v);
-	if( l_v < ZERO_CRITERION) { return 0.0; }
+	double nu = viscosity/density;
+	
+	double denom = (2.0/dt)*(2.0/dt) + (2.0*l_v/h_e)*(2.0*l_v/h_e) 
+	+ (4.0*nu/(h_e*h_e))*(4.0*nu/(h_e*h_e));
 
-	double denom = (2.0/dt)*(2.0/dt) + (2.0*l_v/h_e)*(2.0*l_v/h_e);
+	if(fabs(denom) < ZERO_CRITERION) { return 0.0; }
 
 	double val = sqrt(1.0/denom);
 
@@ -46,7 +51,7 @@ double BBFE_elemmat_mat_levelset(
 		const double tau,
 		const double v_mesh[3])
 {
-	double*  v_ale;
+	double*  v_ale = NULL;
 	v_ale = BB_std_calloc_1d_double(v_ale, 3);
 	for(int d=0; d<3; d++){
 		v_ale[d] = v[d] - v_mesh[d];
@@ -65,15 +70,11 @@ double BBFE_elemmat_mat_levelset(
  * Vector for levelset convection
  **********************************************************/
 double BBFE_elemmat_vec_levelset(
-		double         vec[3],
 		const double   N_i,
 		const double   grad_N_i[3],
 		const double   v[3],
-		double**       grad_v,
 		const double   phi,
 		const double   grad_phi[3],
-		const double   density,
-		const double   viscosity,
 		const double   tau_supg_ml,
 		const double   tau_lsic,
 		const double   dt,
@@ -81,7 +82,7 @@ double BBFE_elemmat_vec_levelset(
 {
 	double val = 0.0;
 
-	double*  v_ale;
+	double*  v_ale = NULL;
 	v_ale = BB_std_calloc_1d_double(v_ale, 3);
 	for(int d=0; d<3; d++){
 		v_ale[d] = v[d] - v_mesh[d];
@@ -112,7 +113,6 @@ double BBFE_elemmat_vec_levelset(
  * Surface tension
  **********************************************************/
 void BBFE_elemmat_vec_surface_tension(
-		const double   N_i,
 		const double   grad_N_i[3],
 		const double   phi,
 		const double   grad_phi[3],
@@ -186,12 +186,13 @@ double BBFE_elemmat_vec_levelset_reinitialize(
 	}
 	//double sign = phi_zero / sqrt(phi_zero * phi_zero + epsilon * epsilon);
 	double l_n = BB_calc_vec3d_length(grad_phi);
+	/*
 	double w_vec_grad_phi;
 	if( l_n < ZERO_CRITERION){
 		w_vec_grad_phi = 0;
 	}else{
 		w_vec_grad_phi = sign * BB_calc_vec3d_dot(grad_phi, grad_phi) / l_n;
-	}
+	}*/
 
 	double val = 0.0;
 
@@ -219,7 +220,7 @@ double BBFE_elemmat_mat_CLSM_reinitialize(
 		const double epsilon)
 {
 	double l_n = BB_calc_vec3d_length(grad_phi);
-	double* n_vec;
+	double* n_vec = NULL;
 	n_vec = BB_std_calloc_1d_double(n_vec, 3);
 	for(int d=0; d<3; d++){
 		if( l_n < ZERO_CRITERION){
@@ -253,7 +254,7 @@ double BBFE_elemmat_vec_CLSM_reinitialize(
 		const double epsilon)
 {
 	double l_n = BB_calc_vec3d_length(normal_vec);
-	double* n_vec;
+	double* n_vec  = NULL;
 	n_vec = BB_std_calloc_1d_double(n_vec, 3);
 	for(int d=0; d<3; d++){
 		if(l_n < ZERO_CRITERION){
@@ -277,7 +278,7 @@ double BBFE_elemmat_vec_CLSM_reinitialize(
 /**********************************************************
  * Vector for L2 Projection of gradient of levelset
  **********************************************************/
-double BBFE_elemmat_vec_grad_phi_L2_projection(
+void BBFE_elemmat_vec_grad_phi_L2_projection(
 		double vec[3],
 		const double N_i,
 		const double grad_phi[3])
