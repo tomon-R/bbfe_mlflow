@@ -28,3 +28,5 @@
 
 lib/
 include/
+
+!util/workspace/**
