@@ -22,7 +22,6 @@
 0.0
 0.0
 -0.98
-<<<<<<< HEAD
 #accel_amp 3
 1
 1
@@ -31,9 +30,6 @@
 1
 1
 1
-=======
-
->>>>>>> 618b48cf309845e5617bde611aa91cb3f0f02938
 #surf_tension_coef 1
 9.8
 #size_interface 1
