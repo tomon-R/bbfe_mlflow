@@ -43,7 +43,7 @@
 #alpha_reinit 1
 1e-7
 #max_iter_reinit 1
-5
+0
 #output_option 1
 0
 #ale_option 1
