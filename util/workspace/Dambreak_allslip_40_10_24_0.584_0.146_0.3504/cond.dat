@@ -21,8 +21,7 @@
 #gravity 3
 0.0
 0.0
--0.98
-<<<<<<< HEAD
+-9.8
 #accel_amp 3
 1
 1
@@ -31,13 +30,10 @@
 1
 1
 1
-=======
-
->>>>>>> 618b48cf309845e5617bde611aa91cb3f0f02938
 #surf_tension_coef 1
 9.8
 #size_interface 1
-0.0438
+0.073
 #dt_reinit 1
 0.2
 #epsilon_reinit 1
