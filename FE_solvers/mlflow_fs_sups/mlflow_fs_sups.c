@@ -528,13 +528,16 @@ void set_element_mat(
 		for(int i=0; i<nl; i++) {
 			for(int j=0; j<nl; j++) {
 				for(int p=0; p<np; p++) {
-					double tau   = BBFE_elemmat_fluid_sups_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+					double coef_stab = 1; // stabilization for convergence of linear solver
+					double tau_supg = BBFE_elemmat_fluid_sups_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+					double tau_pspg = BBFE_elemmat_fluid_sups_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+					tau_pspg *= coef_stab;
 					double tau_c = BBFE_elemmat_mlflow_shock_capturing_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e);
 					//*
 					BBFE_elemmat_fluid_sups_mat(
 							A, basis->N[p][i], basis->N[p][j], 
 							fe->geo[e][p].grad_N[i], fe->geo[e][p].grad_N[j], 
-							v_ip[p], density_ip[p], viscosity_ip[p], tau, tau_c, vals->dt, v_mesh_ip[p]);
+							v_ip[p], density_ip[p], viscosity_ip[p], tau_supg, tau_pspg, tau_c, vals->dt, v_mesh_ip[p]);
 					//*/
 					/*
 					BBFE_elemmat_fluid_sups_mat_crank_nicolson(
@@ -658,8 +661,10 @@ void set_element_vec(
 			double integ_val[4];
 
 			for(int p=0; p<np; p++) {
-				double tau = BBFE_elemmat_fluid_sups_coef(
-							density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+				double coef_stab = 1; // stabilization for convergence of linear solver
+				double tau_supg = BBFE_elemmat_fluid_sups_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+				double tau_pspg = BBFE_elemmat_fluid_sups_coef(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
+				tau_pspg *= coef_stab;
 
 				BBFE_elemmat_vec_surface_tension(
 						fe->geo[e][p].grad_N[i], levelset_ip[p], grad_phi_ip[p], 
@@ -669,7 +674,7 @@ void set_element_vec(
 				//*
 				BBFE_elemmat_fluid_sups_vec(
 						vec, basis->N[p][i], fe->geo[e][p].grad_N[i],
-						v_ip[p], density_ip[p], tau, vals->dt, vals->gravity, 
+						v_ip[p], density_ip[p], tau_supg, tau_pspg, vals->dt, vals->gravity, 
 						surf_tension_ip[p], vals->accel_inertia, v_mesh_ip[p], vals->ale_option);
 				//*/
 				/*

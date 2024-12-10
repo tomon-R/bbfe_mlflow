@@ -83,7 +83,8 @@ void BBFE_elemmat_fluid_sups_mat(
 		const double   v[3],
 		const double   density,
 		const double   viscosity,
-		const double   tau,
+		const double   tau_supg,
+		const double   tau_pspg,
 		const double   tau_c,
 		const double   dt,
 		const double   v_mesh[3])
@@ -116,23 +117,23 @@ void BBFE_elemmat_fluid_sups_mat(
 	double C3 = N_i * grad_N_j[2];
 
 	//SUPG 項
-	double M_s = density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * N_j / dt;
-	double A_s = density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double M_s = density * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i) * N_j / dt;
+	double A_s = density * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i) * BB_calc_vec3d_dot(v_ale, grad_N_j);
 
-	double G_s1 = tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[0];
-	double G_s2 = tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[1];
-	double G_s3 = tau  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[2];
+	double G_s1 = tau_supg  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[0];
+	double G_s2 = tau_supg  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[1];
+	double G_s3 = tau_supg  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[2];
 
 	//PSPG 項
-	double M_p1 = tau * grad_N_i[0] * N_j / dt;
-	double M_p2 = tau * grad_N_i[1] * N_j / dt;
-	double M_p3 = tau * grad_N_i[2] * N_j / dt;
+	double M_p1 = tau_pspg * grad_N_i[0] * N_j / dt;
+	double M_p2 = tau_pspg * grad_N_i[1] * N_j / dt;
+	double M_p3 = tau_pspg * grad_N_i[2] * N_j / dt;
 
-	double A_p1 = tau * grad_N_i[0] * BB_calc_vec3d_dot(v_ale, grad_N_j);
-	double A_p2 = tau * grad_N_i[1] * BB_calc_vec3d_dot(v_ale, grad_N_j);
-	double A_p3 = tau * grad_N_i[2] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p1 = tau_pspg * grad_N_i[0] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p2 = tau_pspg * grad_N_i[1] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p3 = tau_pspg * grad_N_i[2] * BB_calc_vec3d_dot(v_ale, grad_N_j);
 
-	double G_p = tau * (
+	double G_p = tau_pspg * (
 			grad_N_i[0] * grad_N_j[0] +
 			grad_N_i[1] * grad_N_j[1] +
 			grad_N_i[2] * grad_N_j[2]) / density;
@@ -169,7 +170,8 @@ void BBFE_elemmat_fluid_sups_vec(
 		const double   grad_N_i[3],
 		const double   v[3],
 		const double   density,
-		const double   tau,
+		const double   tau_supg,
+		const double   tau_pspg,
 		const double   dt,
 		const double*  gravity,
 		const double*  surf_tension,
@@ -189,22 +191,22 @@ void BBFE_elemmat_fluid_sups_vec(
 
 		val += density * N_i * v[d];
 
-		val += density * tau * BB_calc_vec3d_dot(v_ale, grad_N_i) * v[d];
+		val += density * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i) * v[d];
 
 		/* external force */
 		if(ale_option == 1){
 			val += density * N_i * gravity[d] * dt;
-			val += (density * N_i * gravity[d] * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
+			val += (density * N_i * gravity[d] * dt + surf_tension[d] * dt) * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i);
 		}else{
 			val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
-			val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau * BB_calc_vec3d_dot(v_ale, grad_N_i);
+			val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i);
 		}
 		val += surf_tension[d] * dt;
 
 		vec[d] = val;
 	}
 
-	vec[3] = tau * BB_calc_vec3d_dot(grad_N_i, v);
+	vec[3] = tau_pspg * BB_calc_vec3d_dot(grad_N_i, v);
 
 	for(int i=0; i<4; i++){
 		vec[i] /= dt;
