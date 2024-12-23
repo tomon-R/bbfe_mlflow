@@ -31,4 +31,7 @@ include/
 
 !util/workspace/**
 !docs/prompt/**
+<<<<<<< HEAD
 util/workspace/example/output.log
+=======
+>>>>>>> 6f97f483c7fa0397caf1e6b1c3cf1f302deab1fd
