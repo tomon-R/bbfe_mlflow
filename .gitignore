@@ -31,3 +31,4 @@ include/
 
 !util/workspace/**
 !docs/prompt/**
+util/workspace/example/output.log
