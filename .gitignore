@@ -29,8 +29,8 @@
 lib/
 include/
 
-!util/workspace/*.sh
-!util/workspace/*.csv
-!util/workspace/*.plt
-!util/workspace/*.dat
+!util/workspace/**/*.sh
+!util/workspace/**/*.csv
+!util/workspace/**/*.plt
+!util/workspace/**/*.dat
 !docs/prompt/**
