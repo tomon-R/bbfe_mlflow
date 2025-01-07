@@ -28,3 +28,8 @@
 
 lib/
 include/
+
+!util/workspace/**/*.plt
+!util/workspace/**/*.dat
+!util/workspace/**/*.csv
+!util/workspace/**/*.sh
