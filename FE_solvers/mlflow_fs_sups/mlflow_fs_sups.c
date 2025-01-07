@@ -1089,7 +1089,7 @@ void reinit_levelset(
 					&(sys->mono_reinit),
 					&(sys->mono_com),
 					sys->mono_reinit.mat.R.X,
-					MONOLIS_ITER_BICGSTAB,
+					MONOLIS_ITER_BICGSTAB_N128,
 					MONOLIS_PREC_DIAG,
 					sys->vals.mat_max_iter,
 					sys->vals.mat_epsilon);
@@ -1273,7 +1273,7 @@ void reinit_CLSM(
 					&(sys->mono_reinit),
 					&(sys->mono_com),
 					sys->mono_reinit.mat.R.X,
-					MONOLIS_ITER_BICGSTAB,
+					MONOLIS_ITER_BICGSTAB_N128,
 					MONOLIS_PREC_DIAG,
 					sys->vals.mat_max_iter,
 					sys->vals.mat_epsilon);
@@ -1603,7 +1603,7 @@ int main(
 				&(sys.monolis),
 				&(sys.mono_com),
 				sys.monolis.mat.R.X,
-				MONOLIS_ITER_BICGSTAB,
+				MONOLIS_ITER_BICGSTAB_N128,
 				MONOLIS_PREC_DIAG,
 				sys.vals.mat_max_iter,
 				sys.vals.mat_epsilon);
@@ -1627,7 +1627,7 @@ int main(
 				&(sys.mono_levelset),
 				&(sys.mono_com),
 				sys.mono_levelset.mat.R.X,
-				MONOLIS_ITER_BICGSTAB,
+				MONOLIS_ITER_BICGSTAB_N128,
 				MONOLIS_PREC_DIAG,
 				sys.vals.mat_max_iter,
 				sys.vals.mat_epsilon);
@@ -1647,7 +1647,7 @@ int main(
 				&(sys.mono_L2),
 				&(sys.mono_com),
 				sys.mono_L2.mat.R.X,
-				MONOLIS_ITER_BICGSTAB,
+				MONOLIS_ITER_BICGSTAB_N128,
 				MONOLIS_PREC_DIAG,
 				sys.vals.mat_max_iter,
 				sys.vals.mat_epsilon);
