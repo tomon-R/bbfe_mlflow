@@ -7,7 +7,7 @@
 #time_spacing 1
 0.00025
 #finish_time 1
-10
+1
 #output_interval 1
 40
 #density_l 1
