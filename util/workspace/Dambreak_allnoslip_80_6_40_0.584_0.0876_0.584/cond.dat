@@ -5,11 +5,11 @@
 #mat_max_iter 1
 10000
 #time_spacing 1
-0.00025
+0.0001
 #finish_time 1
-1
+1.5
 #output_interval 1
-40
+100
 #density_l 1
 998
 #density_g 1
@@ -23,7 +23,7 @@
 0.0
 -9.81
 #size_interface 1
-0.0438
+0.0219
 #surf_tension_coef 1
 0
 #dt_reinit 1
