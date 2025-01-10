@@ -23,7 +23,7 @@
 0.0
 -9.81
 #size_interface 1
-0.0219
+0.0438
 #surf_tension_coef 1
 0
 #dt_reinit 1
