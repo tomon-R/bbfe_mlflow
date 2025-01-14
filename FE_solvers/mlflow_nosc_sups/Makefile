@@ -9,8 +9,8 @@ LIBS = -L/usr/local/lib -lm -lstdc++ -L../../submodule/monolis/lib -lmonolis_sol
 INCLUDES_BB = -I../../include
 LIBS_BB = -L../../lib -lBB -lBBFE_std -lBBFE_sys -lBBFE_elemmat -lBBFE_manusol
 
-TARGET1 = mlflow_fs_sups
-OBJS1 = mlflow_fs_sups.o mlflow_impfunc.o mlflow_elemmat.o fluid_core.o fluid_elemmat.o mlflow_utils.o 
+TARGET1 = mlflow_nosc_sups
+OBJS1 = mlflow_nosc_sups.o mlflow_impfunc.o mlflow_elemmat.o fluid_core.o fluid_elemmat.o mlflow_utils.o 
 
 .SUFFIXES: .c .cpp .o
 
