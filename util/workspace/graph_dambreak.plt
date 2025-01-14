@@ -5,7 +5,7 @@ set xrange [0.0 : 3.0]
 set yrange [1.0 : 4.0]
 set mxtics 5
 set mytics 5
-set key bottom Left reverse
+set key bottom Right reverse
 set colorsequence classic
 set terminal pngcairo
 set output "output.png"
