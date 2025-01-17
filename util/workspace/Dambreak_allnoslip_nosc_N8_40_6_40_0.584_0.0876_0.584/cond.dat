@@ -1,0 +1,50 @@
+#num_ip_each_axis 1
+2
+#mat_epsilon 1
+1.000000000000000e-08
+#mat_max_iter 1
+10000
+#time_spacing 1
+0.00001
+#finish_time 4
+1.5
+#output_interval 1
+1000
+#density_l 1
+998
+#density_g 1
+1.205
+#viscosity_l 1
+1.01e-3
+#viscosity_g 1
+1.81e-5
+#gravity 3
+0.0
+0.0
+-9.81
+#size_interface 1
+0.0438
+#surf_tension_coef 1
+0
+#dt_reinit 1
+1e-4
+#epsilon_reinit 1
+0.0438
+#delta_reinit 1
+1e-4
+#alpha_reinit 1
+1e-7
+#max_iter_reinit 1
+5
+#accel_amp 3
+0
+0
+0
+#accel_angle_vel 3
+0
+0
+0
+#output_option 1
+1
+#ale_option 1
+0
