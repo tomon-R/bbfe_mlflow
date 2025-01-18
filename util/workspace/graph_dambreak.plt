@@ -14,4 +14,4 @@ plot \
 "data/dambreak/martin_a_225_n_sqrt2.csv" index 0 using ($2):($1) w p ps 1.25 pt 6 lt 3 title "Exp. (Martin & Moyce, 2.25 in.)",\
 "data/dambreak/Koshizuka_exp_1995.csv" index 0 using ($1):($2) w p ps 1.25 pt 10 lt 4 title "Exp. (Koshizuka et al.)",\
 "data/dambreak/Koshizuka_MPS_1996.csv" index 0 using ($1):($2) w p ps 1.25 pt 8 lt 7 title "MPS (Koshizuka et al.)",\
-"data/dambreak/result_dambreak.csv" index 0 using ($1 * sqrt(2*9.81/0.146)):($2/0.146) w l lt 1 title "Present (dx=0.0146)"
+"data/dambreak/noslip_40_6_40.csv" index 0 using ($1 * sqrt(2*9.81/0.146)):($2/0.146) w l lt 1 title "Present (dx=0.0146)"
