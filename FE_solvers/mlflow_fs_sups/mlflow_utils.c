@@ -28,24 +28,37 @@ int compare(
 
 void output_result_dambreak_data(
 		BBFE_DATA* fe,
+		MONOLIS_COM* monolis_com,
 		double* levelset,
 		const char* directory,
 		double time)
 {
+	int myrank = monolis_mpi_get_global_my_rank();
+	bool* is_internal_elem = NULL;
+	is_internal_elem = BB_std_calloc_1d_bool(is_internal_elem, fe->total_num_elems);
+	monolis_get_bool_list_of_internal_simple_mesh(monolis_com, fe->total_num_nodes, fe->total_num_elems,
+		fe->local_num_nodes, fe->conn, is_internal_elem);
+
 	FILE* fp = NULL;
 	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_DAMBREAK, directory);
 
 	int cnt_bottom = 0;
 	int cnt_height = 0;
 
-	for(int i=0; i<fe->total_num_nodes; i++){
-		if(fabs(fe->x[i][2] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
-			// (y,z)=(0,0)
-			cnt_bottom++;
-		}
-		if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
-			// (x,y)=(0,0)
-			cnt_height++;
+
+	for(int e=0; e<(fe->total_num_elems); e++){
+		if (!is_internal_elem[e]) continue;
+		
+		for(int j=0; j<(fe->local_num_nodes); j++) {
+			int i = fe->conn[e][j];
+			if(fabs(fe->x[i][2] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
+				// (y,z)=(0,0)
+				cnt_bottom++;
+			}
+			if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
+				// (x,y)=(0,0)
+				cnt_height++;
+			}
 		}
 	}
 
@@ -67,32 +80,41 @@ void output_result_dambreak_data(
 	int id_x = 0;
 	int id_z = 0;
 
-	for(int i=0; i<fe->total_num_nodes; i++){
-		if(fabs(fe->x[i][2] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
-			// (y,z)=(0,0)
-			x[id_x] = fe->x[i][0];
-			phi_x[id_x] = levelset[i];
-			pairs_x[id_x].key = x[id_x];
-			pairs_x[id_x].value = phi_x[id_x];
-			id_x++;
-		}
-		if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
-			// (x,y)=(0,0)
-			z[id_z] = fe->x[i][2];
-			phi_z[id_z] = levelset[i];
-			pairs_z[id_z].key = z[id_z];
-			pairs_z[id_z].value = phi_z[id_z];
-			id_z++;
+	for(int e=0; e<(fe->total_num_elems); e++){
+		if (!is_internal_elem[e]) continue;
+		
+		for(int j=0; j<(fe->local_num_nodes); j++) {
+			int i = fe->conn[e][j];
+			if(fabs(fe->x[i][2] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
+				// (y,z)=(0,0)
+				x[id_x] = fe->x[i][0];
+				phi_x[id_x] = levelset[i];
+				pairs_x[id_x].key = x[id_x];
+				pairs_x[id_x].value = phi_x[id_x];
+				id_x++;
+			}
+			if(fabs(fe->x[i][0] - 0.0) < EPS && fabs(fe->x[i][1] - 0.0) < EPS){
+				// (x,y)=(0,0)
+				z[id_z] = fe->x[i][2];
+				phi_z[id_z] = levelset[i];
+				pairs_z[id_z].key = z[id_z];
+				pairs_z[id_z].value = phi_z[id_z];
+				id_z++;
+			}
 		}
 	}
 
 	qsort(pairs_x, cnt_bottom, sizeof(Pair), compare);
 	qsort(pairs_z, cnt_height, sizeof(Pair), compare);
 
-	if(fabs(time-0.0)<EPS){
-		fprintf(fp, "%s, %s, %s, \n", "Time", "x", "z");
+	if(myrank == 0){
+		if(fabs(time-0.0)<EPS){
+			fprintf(fp, "%s, %s, %s, \n", "Time", "x", "z");
+		}
+		fprintf(fp, "%lf, ", time);
 	}
-	fprintf(fp, "%lf, ", time);
+
+	double x_zero = 0;
 	for(int i=0; i<cnt_bottom-1; i++){
 		//fprintf(fp, "%lf, %lf\n", pairs_x[i].key, pairs_x[i].value);
 		if(pairs_x[i].value>0 && pairs_x[i+1].value<0){
@@ -101,16 +123,20 @@ void output_result_dambreak_data(
 			double p1 = pairs_x[i].value;
 			double p2 = pairs_x[i+1].value;
 
-			double x_zero = (p1*x2 - p2*x1)/(p1 - p2);
+			x_zero = (p1*x2 - p2*x1)/(p1 - p2);
 			
 			//fprintf(fp, "%lf, %lf\n", x1, p1);
-			fprintf(fp, "%lf, ", x_zero);
 			//fprintf(fp, "%lf, %lf\n", x2, p2);
 		}else if(fabs(pairs_x[i].value)<EPS){
-			fprintf(fp, "%lf, ", pairs_x[i].key);
+			//fprintf(fp, "%lf, ", pairs_x[i].key);
 		}
 	}
+	monolis_allreduce_R(1, &x_zero, MONOLIS_MPI_SUM, monolis_com->comm);
+	if(myrank == 0){
+		fprintf(fp, "%lf, ", x_zero);
+	}
 
+	double z_zero = 0;
 	for(int i=0; i<cnt_height; i++){
 		if(pairs_z[i].value>0 && pairs_z[i+1].value<0){
 			double z1 = pairs_z[i].key;
@@ -118,14 +144,17 @@ void output_result_dambreak_data(
 			double p1 = pairs_z[i].value;
 			double p2 = pairs_z[i+1].value;
 
-			double z_zero = (p1*z2 - p2*z1)/(p1 - p2);
+			z_zero = (p1*z2 - p2*z1)/(p1 - p2);
 			
 			//fprintf(fp, "%lf, %lf\n", z1, p1);
-			fprintf(fp, "%lf\n", z_zero);
 			//fprintf(fp, "%lf, %lf\n", z2, p2);
 		}else if(fabs(pairs_z[i].value)<EPS){
-			fprintf(fp, "%lf\n", pairs_z[i].key);
+			//fprintf(fp, "%lf\n", pairs_z[i].key);
 		}
+	}
+	monolis_allreduce_R(1, &z_zero, MONOLIS_MPI_SUM, monolis_com->comm);
+	if(myrank == 0){
+		fprintf(fp, "%lf\n", z_zero);
 	}
 
 	BB_std_free_1d_double(x, cnt_bottom);
@@ -134,6 +163,7 @@ void output_result_dambreak_data(
 	BB_std_free_1d_double(phi_z, cnt_height);
 	free(pairs_x);
 	free(pairs_z);
+	BB_std_free_1d_bool(is_internal_elem, fe->total_num_elems);
 
 	fclose(fp);
 
