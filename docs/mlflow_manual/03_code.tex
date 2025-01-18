@@ -8,14 +8,16 @@
 \begin{itemize}
 	\item FE\_solvers : 解析ソルバーが存在するディレクトリ
   \begin{itemize}
-    \item mlflow\_fs : 自由表面流れ解析の実装ファイルをまとめたディレクトリ
+    \item mlflow\_fs\_sups : 自由表面流れ解析の実装ファイルをまとめたディレクトリ
     \begin{itemize}
-    	\item mlflow\_fs.c : 自由表面流れを計算するmain関数を含むファイル
-    	\item mlflow\_fs.h : mlflow\_fs.cの関数のヘッダーファイル
-    	\item mlflow\_core.c：節点が持つ流速・密度・粘性・レベルセット関数などの値の更新やレベルセット関数のヘビサイド関数への変換などの基本的な計算をする関数群のファイル
-    	\item mlflow\_core.h : mlflow\_core.cの関数のヘッダーファイル
+    	\item mlflow\_fs\_sups.c : 自由表面流れを計算するmain関数を含むファイル
+    	\item mlflow\_fs\_sups.h : mlflow\_fs.cの関数のヘッダーファイル
+    	\item mlflow\_impfunc.c：節点が持つ流速・密度・粘性・レベルセット関数などの値の更新やレベルセット関数のヘビサイド関数への変換などの基本的な計算をする関数群のファイル
+    	\item mlflow\_impfunc.h : mlflow\_core.cの関数のヘッダーファイル
     	\item mlflow\_element.c : 自由表面流れの支配方程式の有限要素法により解くときの行列ベクトルを計算する関数群のファイル
     	\item mlflow\_element.h : mlflow\_element.cの関数のヘッダーファイル
+    	\item mlflow\_util.c : ベンチマーク問題の結果の比較のために水面高さなどの指標を計算してファイル出力するための関数群のファイル
+    	\item mlflow\_util.h : mlflow\_util.cの関数のヘッダーファイル
     \end{itemize}
   \end{itemize}
 \end{itemize}
@@ -53,75 +55,167 @@
 └── README.md
 \end{verbatim}
 
-\subsection{mlflow\_fs.c}
-\subsubsection{main関数}
-まずmlflow\_fs.cのmain関数を以下に示す。
+\subsection{main関数}
+
+まずmlflow\_fs\_sups.cのmain関数を以下に示す。
 時間ステップごとのforループの中で、
 最初にmonolisの行列やベクトルの値の初期化やコピーにより値の準備を行い、
 printfで"update density and viscosity step"と出力している部分が、
 前のステップで更新したレベルセット関数をもとに、密度と粘性係数の分布を再計算し更新する部分である。
-printfで"prediction step", "pressure Poisson eq.", "Correction step"と出力している部分が、
-fractional step法におけるそれぞれの計算部分である。
-"levelset function convection step"とprintfで出力しているところからレベルセット関数の移流方程式の計算が始まる。
+printfで"directly solve velocity and pressure step"と出力している部分が、
+直接法による流体の速度と圧力を一体で計算している部分である。
+"levelset function convection step"とprintfで出力しているところがレベルセット関数の移流方程式の計算、
+"L2 projection of Levelset step"がL2プロジェクションにより表面張力の計算に必要なレベルセット関数の1階微分の節点での値を算出している。
+その後、"Reinitialization step"でレベルセット関数の再初期化の計算、"Volume correction step"で体積補正の計算をしている。
+メッシュが移動する場合は"if(sys.vals.ale\_option == 1)"のif文で判断し、メッシュ速度の計算、メッシュ移動速度を考慮した境界条件設定、メッシュの位置の更新を実施している。
+
 \begin{lstlisting}[caption = mlflow\_fs.cのmain関数のレベルセット関数の計算部分抜粋]
 int main(
 		int   argc,
 		char* argv[])
 {
-　
-	/* ~初期化部分の記載省略~ */
+	printf("\n");
+
+	FE_SYSTEM sys;
+
+	monolis_global_initialize();
+	double t1 = monolis_get_time();
+
+	sys.cond.directory = BBFE_fluid_get_directory_name(argc, argv, CODENAME);	
+	read_calc_conditions(&(sys.vals), sys.cond.directory);
+
+	BBFE_fluid_pre(
+			&(sys.fe), &(sys.basis),
+			argc, argv, sys.cond.directory,
+			sys.vals.num_ip_each_axis);
+
+	const char* filename;
+	filename = monolis_get_global_input_file_name(MONOLIS_DEFAULT_TOP_DIR, MONOLIS_DEFAULT_PART_DIR, INPUT_FILENAME_D_BC_V);
+	BBFE_fluid_sups_read_Dirichlet_bc(
+			&(sys.bc),
+			filename,
+			sys.cond.directory,
+			sys.fe.total_num_nodes,
+			4);
+
+	memory_allocation_nodal_values(
+			&(sys.vals),
+			sys.fe.total_num_nodes);
+	
+	BBFE_elemmat_set_Jacobi_mat(&(sys.fe), &(sys.basis));
+	BBFE_elemmat_set_shapefunc_derivative(&(sys.fe), &(sys.basis));
+	
+	BBFE_sys_monowrap_init_monomat(&(sys.monolis),       &(sys.mono_com), &(sys.fe), 4, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_levelset), &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_reinit),   &(sys.mono_com), &(sys.fe), 1, sys.cond.directory);
+	BBFE_sys_monowrap_init_monomat(&(sys.mono_L2),       &(sys.mono_com), &(sys.fe), 3, sys.cond.directory);
+
+	BBFE_elemmat_mat_L2projection(&(sys.mono_L2), &(sys.fe), &(sys.basis), 1.0, 3);
+
+	filename = monolis_get_global_input_file_name(MONOLIS_DEFAULT_TOP_DIR, MONOLIS_DEFAULT_PART_DIR, INPUT_FILENAME_LEVELSET);
+	read_levelset_file(&(sys.fe), &(sys.vals), filename, sys.cond.directory);
+	//BBFE_mlflow_convert_levelset2CLSM(sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+	BBFE_mlflow_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
 
 	/****************** solver ********************/
 	double t = 0.0;
 	int step = 0;
 	int file_num = 0;
-	output_files(&sys, file_num, t);
+
+	// Output files at t=0
+	output_files(&sys, file_num);
+	output_mlflow_data_files(&sys, step, t);
+
+	// Calculate initial volume of gas at t=0
+	BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), &(sys.cond), step);
+
 	while (t < sys.vals.finish_time) {
 		t += sys.vals.dt;
 		step += 1;
 
 		printf("\n%s ----------------- step %d ----------------\n", CODENAME, step);
 
-		BBFE_sys_monowrap_copy_mat(&(sys.mono_ppe0) , &(sys.mono_ppe));
-		BBFE_sys_monowrap_copy_mat(&(sys.mono_corr0), &(sys.mono_corr));
-
-		monolis_clear_mat_value_R(&(sys.mono_pred));
-		monolis_clear_mat_value_R(&(sys.mono_pred2));
-		monolis_clear_mat_value_rhs_R(&(sys.mono_pred));
-		monolis_clear_mat_value_rhs_R(&(sys.mono_pred2));
-		monolis_clear_mat_value_rhs_R(&(sys.mono_ppe));
-		monolis_clear_mat_value_rhs_R(&(sys.mono_corr));
+		monolis_clear_mat_value_R(&(sys.monolis));
 		
 		monolis_clear_mat_value_R(&(sys.mono_levelset));
-		monolis_clear_mat_value_rhs_R(&(sys.mono_levelset));
 
-		BBFE_fluid_copy_velocity(
-				sys.vals.v_pre, 
-				sys.vals.v,
-				sys.fe.total_num_nodes);
+		monolis_clear_mat_value_rhs_R(&(sys.mono_L2));
+
+		// Clear surface tension vector
+		BBFE_mlflow_clear_surface_tension(sys.vals.surf_tension, sys.fe.total_num_nodes);
+
+		// Update inertial acceleration
+		BBFE_mlflow_renew_acceleration(sys.vals.accel_inertia, sys.vals.accel_amp, sys.vals.accel_angle_vel, t);
+
+		if(sys.vals.ale_option == 1){
+			// Update mesh velosity
+			BBFE_mlflow_renew_mesh_velocity(sys.vals.v_mesh, sys.vals.accel_inertia, sys.fe.total_num_nodes, sys.vals.dt);
+			// Dirichlet BC
+			update_Dirichlet_bc_ALE(&(sys.bc), &(sys.vals));
+		}
 
 		printf("%s --- update density and viscosity step ---\n", CODENAME);
-		BBFE_fluid_renew_density(
+		BBFE_mlflow_convert_levelset2heaviside(sys.vals.heaviside, sys.vals.levelset, sys.vals.size_interface, sys.fe.total_num_nodes);
+		//*
+		BBFE_mlflow_renew_vals_by_levelset(
+				sys.vals.heaviside, 
+				sys.vals.density,
+				sys.vals.density_l,
+				sys.vals.density_g,
+				sys.fe.total_num_nodes);
+
+		BBFE_mlflow_renew_vals_by_levelset(
+				sys.vals.heaviside, 
+				sys.vals.viscosity,
+				sys.vals.viscosity_l,
+				sys.vals.viscosity_g,
+				sys.fe.total_num_nodes); //*/
+
+		/*
+		BBFE_mlflow_renew_vals_by_CLSM(
 				sys.vals.levelset, 
 				sys.vals.density,
 				sys.vals.density_l,
 				sys.vals.density_g,
 				sys.fe.total_num_nodes);
-		BBFE_fluid_renew_viscosity(
+
+		BBFE_mlflow_renew_vals_by_levelset(
 				sys.vals.levelset, 
 				sys.vals.viscosity,
 				sys.vals.viscosity_l,
 				sys.vals.viscosity_g,
 				sys.fe.total_num_nodes);
-
-		printf("%s --- prediction step ---\n", CODENAME);
-		/* ~省略~ */
-
-		printf("%s --- pressure Poisson eq. ---\n", CODENAME);
-		/* ~省略~ */
-
-		printf("%s --- Correction step ---\n", CODENAME);
-		/* ~省略~ */
+		//*/
+		
+		printf("%s --- directly solve velocity and pressure step ---\n", CODENAME);
+		set_element_mat(
+				&(sys.monolis),
+				&(sys.fe),
+				&(sys.basis),
+				&(sys.vals));
+		set_element_vec(
+				&(sys.monolis),
+				&(sys.fe),
+				&(sys.basis),
+				&(sys.vals));
+		BBFE_sys_monowrap_set_Dirichlet_bc(
+				&(sys.monolis),
+				sys.fe.total_num_nodes,
+				4,
+				&(sys.bc),
+				sys.monolis.mat.R.B);
+		BBFE_sys_monowrap_solve(
+				&(sys.monolis),
+				&(sys.mono_com),
+				sys.monolis.mat.R.X,
+				MONOLIS_ITER_BICGSTAB_N128,
+				MONOLIS_PREC_DIAG,
+				sys.vals.mat_max_iter,
+				sys.vals.mat_epsilon);
+		BBFE_fluid_sups_renew_velocity(
+				sys.vals.v, 
+				sys.monolis.mat.R.X,
+				sys.fe.total_num_nodes);
 		
 		printf("%s --- levelset function convection step ---\n", CODENAME);
 		set_element_mat_levelset(
@@ -139,33 +233,68 @@ int main(
 				&(sys.mono_com),
 				sys.mono_levelset.mat.R.X,
 				MONOLIS_ITER_BICGSTAB,
-				MONOLIS_PREC_SOR,
+				MONOLIS_PREC_DIAG,
 				sys.vals.mat_max_iter,
 				sys.vals.mat_epsilon);
 
-		BBFE_fluid_renew_levelset(
+		BBFE_mlflow_renew_levelset(
 				sys.vals.levelset, 
 				sys.mono_levelset.mat.R.X,
 				sys.fe.total_num_nodes);
 
-		/**********************************************/
+		printf("%s --- L2 projection of Levelset step ---\n", CODENAME);
+		set_element_vec_L2_projection(
+				&(sys.mono_L2),
+				&(sys.fe),
+				&(sys.basis),
+				&(sys.vals));
+		BBFE_sys_monowrap_solve(
+				&(sys.mono_L2),
+				&(sys.mono_com),
+				sys.mono_L2.mat.R.X,
+				MONOLIS_ITER_BICGSTAB,
+				MONOLIS_PREC_DIAG,
+				sys.vals.mat_max_iter,
+				sys.vals.mat_epsilon);
+		BBFE_fluid_renew_velocity(
+				sys.vals.grad_phi,
+				sys.mono_L2.mat.R.X,
+				sys.fe.total_num_nodes);
+
+		printf("%s --- Reinitialization step ---\n", CODENAME);
+		reinit_levelset(&(sys));
+		//reinit_CLSM(&(sys));
+
+		printf("%s --- Volume correction step ---\n", CODENAME);
+		BBFE_mlflow_volume_correction(&(sys.fe), &(sys.basis), &(sys.vals), &(sys.mono_com), &(sys.cond), step);
+
+		if(sys.vals.ale_option == 1){
+			// Update mesh position with mesh velocity
+			BBFE_mlflow_renew_mesh_position(sys.fe.x, sys.vals.v_mesh, sys.fe.total_num_nodes, sys.vals.dt);
+		}
+
+		/**************** Output result files  ****************/
+		output_mlflow_data_files(&sys, step, t);
 
 		if(step%sys.vals.output_interval == 0) {
-			output_files(&sys, file_num+1, t);
+
+			BBFE_fluid_sups_renew_pressure(
+				sys.vals.p,
+				sys.monolis.mat.R.X,
+				sys.fe.total_num_nodes);
+
+			output_files(&sys, file_num+1);
+
 			file_num += 1;
 		}
 
 	}
 
 	BBFE_fluid_finalize(&(sys.fe), &(sys.basis));
-	BBFE_sys_memory_free_Dirichlet_bc(&(sys.bc_v), sys.fe.total_num_nodes, 3);
-	BBFE_sys_memory_free_Dirichlet_bc(&(sys.bc_p), sys.fe.total_num_nodes, 1);
-	monolis_finalize(&(sys.mono_pred));
-	monolis_finalize(&(sys.mono_ppe));
-	monolis_finalize(&(sys.mono_ppe0));
-	monolis_finalize(&(sys.mono_corr));
-	monolis_finalize(&(sys.mono_corr0));
+	BBFE_sys_memory_free_Dirichlet_bc(&(sys.bc), sys.fe.total_num_nodes, 4);
+	monolis_finalize(&(sys.monolis));
 	monolis_finalize(&(sys.mono_levelset));
+	monolis_finalize(&(sys.mono_reinit));
 
 	double t2 = monolis_get_time();
 	int myrank = monolis_mpi_get_global_my_rank();
@@ -179,11 +308,9 @@ int main(
 	printf("\n");
 
 	return 0;
-
-}
 \end{lstlisting}
 
-\subsubsection{レベルセット関数の移流方程式の計算}
+\subsection{レベルセット関数の移流方程式の計算}
 レベルセット関数の移流方程式の計算は以下の4ステップからなる。
 \begin{itemize}
 	\item set\_element\_mat\_levelset: 係数行列作成
@@ -192,9 +319,11 @@ int main(
 	\item BBFE\_fluid\_renew\_levelset: レベルセット関数の値の更新
 \end{itemize}
 係数行列作成（set\_element\_mat\_levelset）と右辺ベクトル作成の関数（set\_element\_vec\_levelset）はmlflow\_fs.cのソースコード中にあり、その関数の中で、行列と係数の具体的な計算をする関数としてmlflow\_element.cに記載されている関数を呼んでいる。
-流体解析のfractional step法の計算も、係数行列作成、右辺ベクトル作成、連立一次方程式の求解、という流れはレベルセット関数の移流方程式と基本的には同様のステップであるためここでは説明は省略する。
 
 \begin{lstlisting}[caption = mlflow\_fs.cの中のレベルセット関数の係数行列を計算する関数]
+/**********************************************************
+ * Matrix and Vector for Levelset 
+ **********************************************************/
 void set_element_mat_levelset(
 		MONOLIS*     monolis,
 		BBFE_DATA*   fe,
@@ -204,23 +333,27 @@ void set_element_mat_levelset(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double* val_ip;  double* Jacobian_ip;
+	double* val_ip = NULL;  double* Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double** local_v;
+	double** local_v = NULL;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-
-	double** v_ip; 
+	double** v_ip = NULL; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
 
-	double* local_viscosity;
+	double** local_v_mesh = NULL;
+	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
+	double** v_mesh_ip = NULL; 
+	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
+
+	double* local_viscosity = NULL;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
-	double* local_density;
+	double* local_density = NULL;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
-	double* viscosity_ip;
+	double* viscosity_ip = NULL;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
-	double* density_ip;
+	double* density_ip = NULL;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
@@ -230,12 +363,14 @@ void set_element_mat_levelset(
 		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_vector(local_v, fe, vals->v, e, 3);
+		BBFE_elemmat_set_local_array_vector(local_v_mesh, fe, vals->v_mesh, e, 3);
 
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
 
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
+			BBFE_std_mapping_vector3d(v_mesh_ip[p], nl, local_v_mesh, basis->N[p]);
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p] = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
 		}
@@ -246,10 +381,10 @@ void set_element_mat_levelset(
 				for(int p=0; p<np; p++) {
 					val_ip[p] = 0.0;
 
-					double tau = elemmat_supg_coef_ml(v_ip[p], h_e, vals->dt);
+					double tau = elemmat_supg_coef_ml(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 
-					val_ip[p] = elemmat_mat_pred_expl(
-							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau);
+					val_ip[p] = BBFE_elemmat_mat_levelset(
+							basis->N[p][i], basis->N[p][j], fe->geo[e][p].grad_N[i], v_ip[p], tau, v_mesh_ip[p]);
 				}
 
 				double integ_val = BBFE_std_integ_calc(
@@ -266,7 +401,9 @@ void set_element_mat_levelset(
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
 
-	// for multilayer flow
+	BB_std_free_2d_double(local_v_mesh, nl, 3);
+	BB_std_free_2d_double(v_mesh_ip, np, 3);
+
 	BB_std_free_1d_double(local_density, nl);
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(density_ip, np);
@@ -275,6 +412,7 @@ void set_element_mat_levelset(
 \end{lstlisting}
 
 \begin{lstlisting}[caption = mlflow\_fs.cの中のレベルセット関数の右辺ベクトルを計算する関数]
+
 void set_element_vec_levelset(
 		MONOLIS*	monolis,
 		BBFE_DATA*	fe,
@@ -284,33 +422,37 @@ void set_element_vec_levelset(
 	int nl = fe->local_num_nodes;
 	int np = basis->num_integ_points;
 
-	double*  val_ip;
-	double*  Jacobian_ip;
+	double*  val_ip = NULL;
+	double*  Jacobian_ip = NULL;
 	val_ip      = BB_std_calloc_1d_double(val_ip     , np);
 	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
 
-	double** local_v;
+	double** local_v = NULL;
 	local_v = BB_std_calloc_2d_double(local_v, nl, 3);
-
-	double** v_ip; 
+	double** v_ip = NULL; 
 	v_ip = BB_std_calloc_2d_double(v_ip, np, 3);
-	// for multilayer flow
-	double* local_levelset;
+
+	double** local_v_mesh = NULL;
+	local_v_mesh = BB_std_calloc_2d_double(local_v_mesh, nl, 3);
+	double** v_mesh_ip = NULL; 
+	v_mesh_ip = BB_std_calloc_2d_double(v_mesh_ip, np, 3);
+
+	double* local_levelset = NULL;
 	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
-	double* local_viscosity;
+	double* local_viscosity = NULL;
 	local_viscosity = BB_std_calloc_1d_double(local_viscosity, nl);
-	double* local_density;
+	double* local_density = NULL;
 	local_density = BB_std_calloc_1d_double(local_density, nl);
-	double* levelset_ip;
+	double* levelset_ip = NULL;
 	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
-	double* viscosity_ip;
+	double* viscosity_ip = NULL;
 	viscosity_ip = BB_std_calloc_1d_double(viscosity_ip, np);
-	double* density_ip;
+	double* density_ip = NULL;
 	density_ip = BB_std_calloc_1d_double(density_ip, np);
-	double** grad_phi_ip;
+	double** grad_phi_ip = NULL;
 	grad_phi_ip = BB_std_calloc_2d_double(grad_phi_ip, np, 3);
 
-	double*** grad_v_ip;
+	double*** grad_v_ip = NULL;
 	grad_v_ip = BB_std_calloc_3d_double(grad_v_ip, np, 3, 3);
 
 	for(int e=0; e<(fe->total_num_elems); e++) {
@@ -321,7 +463,8 @@ void set_element_vec_levelset(
 		double h_e = cbrt(vol);
 
 		BBFE_elemmat_set_local_array_vector(local_v, fe, vals->v, e, 3);
-		// for multilayer flow
+		BBFE_elemmat_set_local_array_vector(local_v_mesh, fe, vals->v_mesh, e, 3);
+		
 		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
 		BBFE_elemmat_set_local_array_scalar(local_viscosity, fe, vals->viscosity, e);
 		BBFE_elemmat_set_local_array_scalar(local_density, fe, vals->density, e);
@@ -329,8 +472,10 @@ void set_element_vec_levelset(
 		for(int p=0; p<np; p++) {
 			BBFE_std_mapping_vector3d(v_ip[p], nl, local_v, basis->N[p]);
 			BBFE_std_mapping_vector3d_grad(grad_v_ip[p], nl, local_v, fe->geo[e][p].grad_N);
+
+			BBFE_std_mapping_vector3d(v_mesh_ip[p], nl, local_v_mesh, basis->N[p]);
+
 			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
-			// for multilayer flow
 			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
 			viscosity_ip[p] = BBFE_std_mapping_scalar(nl, local_viscosity, basis->N[p]);
 			density_ip[p]   = BBFE_std_mapping_scalar(nl, local_density, basis->N[p]);
@@ -338,17 +483,13 @@ void set_element_vec_levelset(
 
 		for(int i=0; i<nl; i++) {
 			for(int p=0; p<np; p++) {
-				double tau_supg_ml = elemmat_supg_coef_ml(v_ip[p], h_e, vals->dt);
+				double tau_supg_ml = elemmat_supg_coef_ml(density_ip[p], viscosity_ip[p], v_ip[p], h_e, vals->dt);
 				double tau_lsic    = elemmat_lsic_coef(h_e, v_ip[p]);
 
-				double vec[3];
-				
-				val_ip[p] = elemmat_vec_levelset(
-					vec, 
+				val_ip[p] = BBFE_elemmat_vec_levelset(
 					basis->N[p][i], fe->geo[e][p].grad_N[i], 
-					v_ip[p], grad_v_ip[p],
-					levelset_ip[p], grad_phi_ip[p],
-					density_ip[p], viscosity_ip[p], tau_supg_ml, tau_lsic, vals->dt);
+					v_ip[p],levelset_ip[p], grad_phi_ip[p],
+					tau_supg_ml, tau_lsic, vals->dt, v_mesh_ip[p]);
 			}
 			double integ_val = BBFE_std_integ_calc(
 					np, val_ip, basis->integ_weight, Jacobian_ip);
@@ -362,7 +503,10 @@ void set_element_vec_levelset(
 	BB_std_free_2d_double(local_v, nl, 3);
 	BB_std_free_2d_double(v_ip, np, 3);
 	BB_std_free_3d_double(grad_v_ip, np, 3, 3);
-	// for multilayer flow
+
+	BB_std_free_2d_double(local_v_mesh, nl, 3);
+	BB_std_free_2d_double(v_mesh_ip, np, 3);
+
 	BB_std_free_1d_double(local_density, nl);
 	BB_std_free_1d_double(local_viscosity, nl);
 	BB_std_free_1d_double(local_levelset, nl);
@@ -373,161 +517,484 @@ void set_element_vec_levelset(
 }
 \end{lstlisting}
 
-\subsection{mlflow\_element.c}
+\subsection{流体の速度と圧力の計算}
 
-mlflow\_element.cに含まれる関数のうち、レベルセット関数の移流方程式(\ref{ls-eq})を解く右辺行列の計算部分を以下に示す。
-\begin{lstlisting}[caption = mlflow\_element.cのレベルセット関数の計算の右辺ベクトルの計算]
-/**********************************************************
- * levelset function convection
- **********************************************************/
-double elemmat_vec_levelset(
-		double         vec[3],
+fluid\_element.cに含まれる関数のうち、係数行列と右辺ベクトルの計算部分を以下に示す。
+\begin{lstlisting}[caption = fluid\_element.cの係数行列の計算]
+
+void BBFE_elemmat_fluid_sups_mat(
+		double         mat[4][4],
+		const double   N_i,
+		const double   N_j,
+		const double   grad_N_i[3],
+		const double   grad_N_j[3],
+		const double   v[3],
+		const double   density,
+		const double   viscosity,
+		const double   tau_supg,
+		const double   tau_pspg,
+		const double   tau_c,
+		const double   dt,
+		const double   v_mesh[3])
+{
+	double*  v_ale = NULL;
+	v_ale = BB_std_calloc_1d_double(v_ale, 3);
+	for(int d=0; d<3; d++){
+		v_ale[d] = v[d] - v_mesh[d];
+	}
+
+	double M = density * N_i * N_j / dt;
+	double A = density * N_i * BB_calc_vec3d_dot(v_ale, grad_N_j);
+
+	double G1 = - grad_N_i[0] * N_j;
+	double G2 = - grad_N_i[1] * N_j;
+	double G3 = - grad_N_i[2] * N_j;
+
+	double D_11 = viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[0]*grad_N_j[0] );
+	double D_12 = viscosity * grad_N_i[1] * grad_N_j[0];
+	double D_13 = viscosity * grad_N_i[2] * grad_N_j[0];
+	double D_21 = viscosity * grad_N_i[0] * grad_N_j[1];
+	double D_22 = viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[1]*grad_N_j[1] );
+	double D_23 = viscosity * grad_N_i[2] * grad_N_j[1];
+	double D_31 = viscosity * grad_N_i[0] * grad_N_j[2];
+	double D_32 = viscosity * grad_N_i[1] * grad_N_j[2];
+	double D_33 = viscosity * ( BB_calc_vec3d_dot(grad_N_i, grad_N_j) + grad_N_i[2]*grad_N_j[2] );
+
+	double C1 = N_i * grad_N_j[0];
+	double C2 = N_i * grad_N_j[1];
+	double C3 = N_i * grad_N_j[2];
+
+	//SUPG 項
+	double M_s = density * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i) * N_j / dt;
+	double A_s = density * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i) * BB_calc_vec3d_dot(v_ale, grad_N_j);
+
+	double G_s1 = tau_supg  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[0];
+	double G_s2 = tau_supg  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[1];
+	double G_s3 = tau_supg  * BB_calc_vec3d_dot(v, grad_N_i) * grad_N_j[2];
+
+	//PSPG 項
+	double M_p1 = tau_pspg * grad_N_i[0] * N_j / dt;
+	double M_p2 = tau_pspg * grad_N_i[1] * N_j / dt;
+	double M_p3 = tau_pspg * grad_N_i[2] * N_j / dt;
+
+	double A_p1 = tau_pspg * grad_N_i[0] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p2 = tau_pspg * grad_N_i[1] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+	double A_p3 = tau_pspg * grad_N_i[2] * BB_calc_vec3d_dot(v_ale, grad_N_j);
+
+	double G_p = tau_pspg * (
+			grad_N_i[0] * grad_N_j[0] +
+			grad_N_i[1] * grad_N_j[1] +
+			grad_N_i[2] * grad_N_j[2]) / density;
+
+	//Shock Capturing項
+	double C_s1 = density * tau_c * grad_N_i[0] * grad_N_j[0];
+	double C_s2 = density * tau_c * grad_N_i[1] * grad_N_j[1];
+	double C_s3 = density * tau_c * grad_N_i[2] * grad_N_j[2];
+
+	mat[0][0] = M + M_s + A + A_s + D_11 + C_s1;
+	mat[0][1] = D_12;
+	mat[0][2] = D_13;
+	mat[0][3] = G1 + G_s1;
+	mat[1][0] = D_21;
+	mat[1][1] = M + M_s + A + A_s + D_22 + C_s2;
+	mat[1][2] = D_23;
+	mat[1][3] = G2 + G_s2;
+	mat[2][0] = D_31;
+	mat[2][1] = D_32;
+	mat[2][2] = M + M_s + A + A_s + D_33 + C_s3;
+	mat[2][3] = G3 + G_s3;
+	mat[3][0] = C1 + M_p1 + A_p1;
+	mat[3][1] = C2 + M_p2 + A_p2;
+	mat[3][2] = C3 + M_p3 + A_p3;
+	mat[3][3] = G_p;
+
+	BB_std_free_1d_double(v_ale, 3);
+}
+
+\end{lstlisting}
+
+\begin{lstlisting}[caption = fluid\_element.cの右辺ベクトルの計算]
+void BBFE_elemmat_fluid_sups_vec(
+		double         vec[4],
 		const double   N_i,
 		const double   grad_N_i[3],
 		const double   v[3],
-		double**       grad_v,
+		const double   density,
+		const double   tau_supg,
+		const double   tau_pspg,
+		const double   dt,
+		const double*  gravity,
+		const double*  surf_tension,
+		const double*  accel_inertia,
+		const double   v_mesh[3],
+		const int      ale_option
+		)
+{
+	double*  v_ale = NULL;
+	v_ale = BB_std_calloc_1d_double(v_ale, 3);
+	for(int d=0; d<3; d++){
+		v_ale[d] = v[d] - v_mesh[d];
+	}
+
+	for(int d=0; d<3; d++) {
+		double val = 0.0;
+
+		val += density * N_i * v[d];
+
+		val += density * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i) * v[d];
+
+		/* external force */
+		if(ale_option == 1){
+			val += density * N_i * gravity[d] * dt;
+			val += (density * N_i * gravity[d] * dt + surf_tension[d] * dt) * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i);
+		}else{
+			val += density * N_i * (gravity[d] + accel_inertia[d]) * dt;
+			val += (density * N_i * (gravity[d] + accel_inertia[d]) * dt + surf_tension[d] * dt) * tau_supg * BB_calc_vec3d_dot(v_ale, grad_N_i);
+		}
+		val += surf_tension[d] * dt;
+
+		vec[d] = val;
+	}
+
+	vec[3] = tau_pspg * BB_calc_vec3d_dot(grad_N_i, v);
+
+	for(int i=0; i<4; i++){
+		vec[i] /= dt;
+	}
+	BB_std_free_1d_double(v_ale, 3);
+}
+\end{lstlisting}
+
+\subsection{近似Heviside関数の計算}
+mlflow\_core.cに含まれる関数のうち、二層流れに関連する関数として、
+レベルセット関数を近似Heaviside関数による平滑化する式(\ref{ls-heaviside})を計算する関数と、密度と粘性の計算式(\ref{ls-rho}), (\ref{ls-mu})を計算する関数を示す。
+
+\begin{lstlisting}[caption = mlflow\_impfunc.cのレベルセット関数の近似Heaviside関数による平滑化計算]
+void BBFE_mlflow_convert_levelset2heaviside(
+		double* heaviside,
+		double* levelset,
+		const double size_interface,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++) {
+		double h1 = levelset[i]/size_interface + 1.0/M_PI*sin(M_PI*levelset[i]/size_interface);
+		if(h1 > 1.0) h1 = 1.0;
+		if(h1 < -1.0) h1 = -1.0;
+		heaviside[i] = 0.5 * h1;
+	}
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption = mlflow\_impfunc.cの密度と粘性の計算]
+/**********************************************************
+ * Renew values based on levelset function
+ **********************************************************/
+void BBFE_mlflow_renew_vals_by_levelset(
+		double* levelset,
+		double* val_vec,
+		double val_l,
+		double val_g,
+		const int total_num_nodes)
+{
+	for(int i=0; i<total_num_nodes; i++){
+		val_vec[i] = 0.5 * (val_l + val_g) + levelset[i] * (val_l - val_g);
+	}
+}
+\end{lstlisting}
+
+\subsection{表面張力の計算}
+表面張力は以下の関数で計算し、surf\_tension\_vecに格納している。CLSMを使った計算は使用していないためコメントアウトしている。
+\begin{lstlisting}[caption = mlflow\_elemmat.cにおける表面張力の計算]
+/**********************************************************
+ * Surface tension
+ **********************************************************/
+void BBFE_elemmat_vec_surface_tension(
+		const double   grad_N_i[3],
 		const double   phi,
 		const double   grad_phi[3],
-		const double   density,
-		const double   viscosity,
-		const double   tau_supg_ml,
-		const double   tau_lsic,
-		const double   dt)
+		const double   sigma,
+		double*        surf_tension_vec,
+		const double   size_interface)
 {
+	double l_n = BB_calc_vec3d_length(grad_phi);
+
+	double kappa; // curvature
+	double delta;
+	double alpha = size_interface;
+
+	if( l_n < ZERO_CRITERION){
+		kappa = 0;
+	}else{
+		kappa = BB_calc_vec3d_dot(grad_N_i, grad_phi) / l_n;
+	}
+	
+	//* Conventional LSM
+	if(fabs(phi) <= alpha){
+		delta = (1 + cos(M_PI*phi/alpha))/(2*alpha);
+	}else{
+		delta = 0;
+	}
+	for(int d=0; d<3; d++) {
+		if( l_n < ZERO_CRITERION){
+			surf_tension_vec[d] = 0;
+		}else{
+			surf_tension_vec[d] = sigma * kappa * grad_phi[d] / l_n * delta;;
+		}
+	}
+	//*/
+
+	/* CLSM
+	double dist = log(1.0/phi-1) * size_interface;
+	if(fabs(dist) <= alpha){
+		delta = (1 + cos(M_PI*dist/alpha))/(2*alpha);
+	}else{
+		delta = 0;
+	}
+	for(int d=0; d<3; d++) {
+		if( l_n < ZERO_CRITERION){
+			surf_tension_vec[d] = 0;
+		}else{
+	   		surf_tension_vec[d] = sigma * kappa * grad_phi[d] / l_n * delta;
+	   	}
+	}
+	//*/
+}
+\end{lstlisting}
+
+\subsection{再初期化の計算}
+再初期化は以下の関数で計算している。
+\begin{lstlisting}[caption = mlflow\_fs\_sups.cにおける再初期化の計算]
+void reinit_levelset(
+		FE_SYSTEM*  sys)
+{
+	double t = 0.0;
+	int step = 0;
+	double error = 1.0e10;
+
+	double* r = NULL;
+	r = BB_std_calloc_1d_double(r, sys->fe.total_num_nodes);
+
+	for(int i=0; i<sys->fe.total_num_nodes; i++){
+		sys->vals.levelset_tmp[i] = sys->vals.levelset[i];
+	}
+
+	while (step < sys->vals.max_iter_reinit && sqrt(error)/sys->vals.dt_reinit > sys->vals.delta_reinit) {
+		t += sys->vals.dt_reinit;
+		step += 1;
+		monolis_clear_mat_value_R(&(sys->mono_reinit));
+		monolis_clear_mat_value_rhs_R(&(sys->mono_reinit));
+
+		BBFE_elemmat_set_global_mat_cmass_const(
+					&(sys->mono_reinit),
+					&(sys->fe),
+					&(sys->basis), 
+					1.0, 
+					1);
+		set_element_vec_levelset_reinitialize(
+					&(sys->mono_reinit),
+					&(sys->fe),
+					&(sys->basis),
+					&(sys->vals));
+		BBFE_sys_monowrap_solve(
+					&(sys->mono_reinit),
+					&(sys->mono_com),
+					sys->mono_reinit.mat.R.X,
+					MONOLIS_ITER_BICGSTAB,
+					MONOLIS_PREC_DIAG,
+					sys->vals.mat_max_iter,
+					sys->vals.mat_epsilon);
+
+		for(int i=0; i<(sys->fe.total_num_nodes); i++) {
+			// Residual
+			r[i] = sys->mono_reinit.mat.R.X[i] - sys->vals.levelset[i];
+			// Update levelset value
+			sys->vals.levelset[i] = sys->mono_reinit.mat.R.X[i];
+		}
+
+		monolis_inner_product_R(
+					&(sys->mono_reinit),
+					&(sys->mono_com),
+					1,
+					r,
+					r,
+					&error);
+
+		printf("Reinitialization Step: %d\n", step);
+		printf("Error: %f, Delta: %f\n", sqrt(error)/sys->vals.dt_reinit, sys->vals.delta_reinit);
+	}
+
+	BB_std_free_1d_double(r, sys->fe.total_num_nodes);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption = mlflow\_elemmat.cにおける再初期化の右辺ベクトルの計算]
+/**********************************************************
+ * Vector for Reinitialization for Levelset Method 
+ **********************************************************/
+double BBFE_elemmat_vec_levelset_reinitialize(
+		const double N_i,
+		const double grad_N_i[3],
+		const double phi,
+		const double phi_zero,
+		const double grad_phi[3],
+		const double dt,
+		const double epsilon,
+		const double alpha)
+{
+	double tmp = sqrt(phi_zero * phi_zero + epsilon * epsilon);
+	double sign;
+	if( tmp < ZERO_CRITERION){
+		sign = 0;
+	}else{
+		sign = phi_zero / tmp;
+	}
+	//double sign = phi_zero / sqrt(phi_zero * phi_zero + epsilon * epsilon);
+	double l_n = BB_calc_vec3d_length(grad_phi);
+	/*
+	double w_vec_grad_phi;
+	if( l_n < ZERO_CRITERION){
+		w_vec_grad_phi = 0;
+	}else{
+		w_vec_grad_phi = sign * BB_calc_vec3d_dot(grad_phi, grad_phi) / l_n;
+	}*/
+
 	double val = 0.0;
 
-	val += - N_i *( 
-			 v[0] * grad_phi[0] + 
-			 v[1] * grad_phi[1] + 
-			 v[2] * grad_phi[2] 
-			 );
-
-	val += - tau_supg_ml * BB_calc_vec3d_dot(v, grad_N_i) * BB_calc_vec3d_dot(v, grad_phi);
-
-   	val += - tau_lsic * BB_calc_vec3d_dot(grad_N_i, grad_phi);
-
-	val *= dt;
-
 	val += N_i * phi;
-
-	val += tau_supg_ml * BB_calc_vec3d_dot(v, grad_N_i) * phi;
+	//val += - N_i * w_vec_grad_phi * dt;
+	//val += N_i * sign * dt;
+	val += N_i * (sign * (1 - l_n)) * dt;
+	val -= alpha * BB_calc_vec3d_dot(grad_phi, grad_N_i);
 
 	return val;
 }
 \end{lstlisting}
 
-以下に、流体の中間流速を求める計算式(\ref{matrix-midvel})の右辺ベクトルを計算する関数を示す。表面張力も外力項として計算している。
-\begin{lstlisting}[caption = mlflow\_element.cの中間流速の右辺ベクトルの計算]
-void elemmat_vec_pred_expl(
-		double         vec[3],
-		const double   N_i,
-		const double   grad_N_i[3],
-		const double   v[3],
-		double**       grad_v,
-		const double   density,
-		const double   viscosity,
-		const double   tau,
-		const double   dt, 
-		const double*  gravity,
-		const double   phi,
-		const double   grad_phi[3],
-		const double   sigma,
-		double         surf_tension_vec[3],
-		double         size_interface)
+\subsection{体積補正の計算}
+体積補正は以下の関数で計算している。
+\begin{lstlisting}[caption = mlflow\_fs\_sups.cにおける体積補正の計算]
+/**********************************************************
+ * Volume correction
+ **********************************************************/
+void BBFE_mlflow_volume_correction(
+		BBFE_DATA*   fe,
+		BBFE_BASIS*  basis,
+		VALUES*      vals,
+		MONOLIS_COM* monolis_com,
+		CONDITIONS*  cond,
+		int          step)
 {
-	double dyn_vis = viscosity/density;
+	// calculate volume of gas
+	double vol_gas = 0.0;
+	double vol_interface = 0.0;
 
-	/* calc terms of surface tension */
-	double l_n = BB_calc_vec3d_length(grad_phi);
-	double kappa;
-	if( l_n < ZERO_CRITERION){
-		kappa = 0;
-	}else{
-		kappa = - BB_calc_vec3d_dot(grad_N_i, grad_phi) / l_n;
+	int nl = fe->local_num_nodes;
+	int np = basis->num_integ_points;
+
+	double*  vol_g_ip = NULL;
+	double*  vol_i_ip = NULL;
+	double*  Jacobian_ip = NULL;
+	vol_g_ip      = BB_std_calloc_1d_double(vol_g_ip     , np);
+	vol_i_ip      = BB_std_calloc_1d_double(vol_i_ip     , np);
+	Jacobian_ip = BB_std_calloc_1d_double(Jacobian_ip, np);
+
+	double* local_heaviside = NULL;
+	local_heaviside = BB_std_calloc_1d_double(local_heaviside, nl);
+	double* heaviside_ip = NULL;
+	heaviside_ip = BB_std_calloc_1d_double(heaviside_ip, np);
+
+	double* local_levelset = NULL;
+	local_levelset = BB_std_calloc_1d_double(local_levelset, nl);
+	double* levelset_ip = NULL;
+	levelset_ip = BB_std_calloc_1d_double(levelset_ip, np);
+
+	bool* is_internal_elem = NULL;
+	is_internal_elem = BB_std_calloc_1d_bool(is_internal_elem, fe->total_num_elems);
+	monolis_get_bool_list_of_internal_simple_mesh(monolis_com, fe->total_num_nodes, fe->total_num_elems,
+		fe->local_num_nodes, fe->conn, is_internal_elem);
+
+	for(int e=0; e<(fe->total_num_elems); e++) {
+		if (!is_internal_elem[e]) continue;
+
+		BBFE_elemmat_set_Jacobian_array(Jacobian_ip, np, e, fe);
+
+		BBFE_elemmat_set_local_array_scalar(local_heaviside, fe, vals->heaviside, e);
+		BBFE_elemmat_set_local_array_scalar(local_levelset, fe, vals->levelset, e);
+
+		for(int p=0; p<np; p++) {	
+			heaviside_ip[p]  = BBFE_std_mapping_scalar(nl, local_heaviside, basis->N[p]);
+			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
+		}
+
+		for(int i=0; i<nl; i++) {
+			for(int p=0; p<np; p++) {
+				double alpha = vals->size_interface;
+				double delta;
+
+				vol_g_ip[p] = basis->N[p][i] *  (0.5 - heaviside_ip[p]);
+
+				if(fabs(levelset_ip[p]) <= alpha){
+					delta = (1 + cos(M_PI*levelset_ip[p]/alpha))/(2*alpha);
+				}else{
+					delta = 0;
+				}
+				vol_i_ip[p] = basis->N[p][i] * delta;
+			}
+			double integ_vol_g = BBFE_std_integ_calc(
+					np, vol_g_ip, basis->integ_weight, Jacobian_ip);
+			double integ_vol_i = BBFE_std_integ_calc(
+					np, vol_i_ip, basis->integ_weight, Jacobian_ip);
+
+			vol_gas += integ_vol_g;
+			vol_interface += integ_vol_i;
+		}
 	}
-	double delta;
-	double alpha = size_interface;
-	if(abs(phi) < alpha){
-		delta = (1 + cos(M_PI*phi/alpha))/(2*alpha);
-	}else{
-		delta = 0;
+	// MPI
+	monolis_allreduce_R(1, &vol_gas, MONOLIS_MPI_SUM, monolis_com->comm);
+	monolis_allreduce_R(1, &vol_interface, MONOLIS_MPI_SUM, monolis_com->comm);
+
+	double vol_gas_error = vol_gas - vals->volume_g_init;
+
+	// calculate L_error
+	double L_error = vol_gas_error/vol_interface;
+
+	// add L_error to levelset
+	if(step == 0){
+		vals->volume_g_init = vol_gas;
+		printf("Volume of gas at T=0: %lf\n", vals->volume_g_init);
+	}else if(step > 0){
+		printf("V_g(0): %lf, V_g(%d): %lf, V_g(%d)/V_g(0): %lf (%%)\n", 
+			vals->volume_g_init, step, vol_gas, step, vol_gas/vals->volume_g_init*100);
+
+		for(int i=0; i<(fe->total_num_nodes); i++) {
+			vals->levelset[i] += L_error;
+		}
 	}
 
-	for(int d=0; d<3; d++) {
-		double val = 0.0;
-		
-		val += -N_i * ( 
-				 v[0]*grad_v[d][0] + 
-				 v[1]*grad_v[d][1] + 
-				 v[2]*grad_v[d][2] 
-				 );
-
-		val += -dyn_vis * ( 
-				 grad_N_i[0]*grad_v[d][0] +
-				 grad_N_i[1]*grad_v[d][1] +
-				 grad_N_i[2]*grad_v[d][2] 
-				 );
-
-	   	val += -tau * BB_calc_vec3d_dot(v, grad_N_i) * BB_calc_vec3d_dot(v, grad_v[d]);
-
-	   	val += N_i * gravity[d];
-
-	   	surf_tension_vec[d] = sigma * kappa * grad_phi[d] / density;
-	   	val += surf_tension_vec[d];
-
-		val *= dt;
-
-		val += N_i * v[d];
-
-		val += tau * BB_calc_vec3d_dot(v, grad_N_i) * v[d];
-
-		vec[d] = val;
+	// file output
+	FILE* fp = NULL;
+	fp = BBFE_sys_write_add_fopen(fp, OUTPUT_FILENAME_VOLUME, cond->directory);
+	int myrank = monolis_mpi_get_global_my_rank();
+	if(myrank == 0){
+		if(step == 0){
+			fprintf(fp, "%s, %s, %s, %s\n", "Time", "V_g(t)", "V_g(0)", "V_g(t)/V_g(0)");
+		}else{
+			fprintf(fp, "%lf, %lf, %lf, %lf\n", step*vals->dt, vol_gas, vals->volume_g_init, vol_gas/vals->volume_g_init*100);
+		}
 	}
-}
-\end{lstlisting}
+	fclose(fp);
 
-\subsection{mlflow\_core.c}
-mlflow\_core.cに含まれる関数のうち、二層流れに関連する関数として、
-レベルセット関数を近似Heaviside関数による平滑化する式(\ref{ls-heaviside})を計算する関数と、密度と粘性の計算式(\ref{ls-rho}), (\ref{ls-mu})を計算する関数を示す。
+	BB_std_free_1d_double(vol_g_ip,      np);
+	BB_std_free_1d_double(vol_i_ip,      np);
+	BB_std_free_1d_double(Jacobian_ip, np);
 
-\begin{lstlisting}[caption = mlflow\_core.cのレベルセット関数の近似Heaviside関数による平滑化計算]
-void BBFE_fluid_convert_levelset2heaviside(
-		double* levelset,
-		const double mesh_size,
-		const int total_num_nodes)
-{
-	for(int i=0; i<total_num_nodes; i++) {
-		double h1 = levelset[i]/mesh_size+1/M_PI*sin(M_PI*levelset[i]/mesh_size);
-		if(h1 > 1.0) h1 = 1.0;
-		if(h1 < -1.0) h1 = -1.0;
-		levelset[i] = 0.5 * h1;
-	}
-}
-\end{lstlisting}
+	BB_std_free_1d_double(local_heaviside, nl);
+	BB_std_free_1d_double(heaviside_ip, np);
 
-\begin{lstlisting}[caption = mlflow\_core.cの密度と粘性の計算]
-void BBFE_fluid_renew_density(
-		double* levelset,
-		double* density,
-		double density_l,
-		double density_g,
-		const int total_num_nodes)
-{
-	for(int i=0; i<total_num_nodes; i++){
-		density[i] = 0.5 * (density_l + density_g) + levelset[i] * (density_l - density_g);
-	}
-}
+	BB_std_free_1d_double(local_levelset, nl);
+	BB_std_free_1d_double(levelset_ip, np);
 
-void BBFE_fluid_renew_viscosity(
-		double* levelset,
-		double* viscosity,
-		double viscosity_l,
-		double viscosity_g,
-		const int total_num_nodes)
-{
-	for(int i=0; i<total_num_nodes; i++){
-		viscosity[i] = 0.5 * (viscosity_l + viscosity_g) + levelset[i] * (viscosity_l - viscosity_g);
-	}
+	BB_std_free_1d_bool(is_internal_elem, fe->total_num_elems);
 }
 \end{lstlisting}
 
@@ -576,36 +1043,66 @@ levelset.datのフォーマットは以下の通り。1行目の"\#levelset"は�
 
 cond.datのフォーマットの一例は以下の通り。"\#(ラベル) (変数の数)"を書いた次の行に"(変数の値)"を記載する。"\#gravity 3"のように、ベクトルで変数が複数ある場合は、それぞれの数値を改行しながら記載する。
 二層流れに関係するパラメータとして、\#density\_lは液体(liquid)の密度、\#density\_gは気体(gas)の密度、\#viscosity\_lは液体の粘性係数、\#viscosity\_gは気体の粘性係数、\#size\_interfaceはヘビサイド関数で近似する計算における界面厚さのパラメータであり、通常メッシュサイズの1～5倍が取られる。\#surf\_tension\_coefは表面張力の計算式における係数である。
-\begin{lstlisting}[]
-#num_ip_each_axis 1
-2
-#mat_epsilon 1
-1.000000000000000e-08
-#mat_max_iter 1
-10000
-#time_spacing 1
-0.001
-#finish_time 1
-4
-#output_interval 1
-100
-#density_l 1
-1000
-#density_g 1
-100
-#viscosity_l 1
-10
-#viscosity_g 1
-1
-#gravity 3
-0.0
-0.0
--0.98
-#size_interface 1
-0.15
-#surf_tension_coef 1
-9.8
+以下設定パラメータの設定の考え方を補足する。
+\begin{itemize}
+\item dt\_reinit: 流体解析の時間刻み幅とは関係なく設定可能な値です。今回は実験的にいくつか試したうえで数回の繰り返し計算で効果がある値を設定しています。
+\item epsilon\_reinit: メッシュ幅程度とするのが一般的です。パラメータsize\_interfaceと同じく界面での不連続な関数を滑らかにするためのパラメータであり、size\_interfaceの値はメッシュ幅$\Delta x$～$5\Delta x$程度とすることが一般的で、現状size\_interfaceと同じ値としています。
+\item delta\_reinit: 現状収束判定は反復回数で決まるようにしており、delta\_reinitの収束判定閾値では引っかからないような小さい値としています。収束判定の方法も検討中であり、delta\_reinitは回数ではなく収束判定閾値を使って判定する場合に使用するために用意したパラメータで今後使用する可能性があります。
+\item alpha\_reinit: 計算の安定化のための項の係数であり大きくしすぎると結果が鈍ってしまうため、計算に問題がなければ0でもよい値です。スロッシングで一部レベルセット関数の分布が乱れたのに対してこのパラメータを入れると安定に計算できているため1e-7と設定しています。1e-8だとあまり効果がなく、1e-6だと効果が大きすぎて計算が鈍ってしまうため1e-7で設定しています。
+\item max\_iter\_reinit: このパラメータの回数だけ再初期化の反復計算をするようにしており、3回で計算している論文や、5回以下で十分という指摘されている文献があるため、現状は5回で設定しています。
+\end{itemize}
 
+\begin{lstlisting}[caption = cond.dat]
+#num_ip_each_axis 1    数値積分の1辺の積分点数
+2                        
+#mat_epsilon 1         線形ソルバーの反復法の許容誤差
+1.000000000000000e-08    
+#mat_max_iter 1        線形ソルバーの最大反復回数
+10000                    
+#time_spacing 1        流体ソルバーの時間刻み幅
+0.001                    
+#finish_time 1         計算終了時間
+10                       
+#output_interval 1     結果ファイルを出力するステップ間隔
+100
+#density_l 1           液相の密度
+1000
+#density_g 1           気相の密度
+1.2
+#viscosity_l 1         液相の粘性係数
+1.0e-3
+#viscosity_g 1         気相の粘性係数
+1.8e-5
+#gravity 3             重力加速度ベクトル
+0.0
+0.0
+-9.8
+#size_interface 1      界面厚さ
+0.1
+#surf_tension_coef 1   表面張力係数
+0
+#dt_reinit 1           レベルセット関数の再初期化計算の時間刻み幅dt
+1e-4
+#epsilon_reinit 1      レベルセット関数の再初期化計算のパラメータ（sgn(phi)を近似するパラメータ）
+0.1
+#delta_reinit 1        レベルセット関数の再初期化計算の収束判定値
+1e-4
+#alpha_reinit 1        レベルセット関数の再初期化計算の安定化項の係数 
+1e-7
+#max_iter_reinit       レベルセット関数の再初期化の最大反復回数
+5
+#accel_amp 3           慣性加速度ベクトルの振幅
+0.0093
+0
+0
+#accel_angle_vel 3     慣性加速度ベクトルの角速度
+5.311
+0
+0
+#output_option 1       ベンチマークの計測ファイルを出力するオプション（1:ダムブレイク、2:気泡上昇流れ、3:スロッシング）
+3
+#ale_option 1          ALE法でメッシュを移動させるかどうかのオプション (0:メッシュ移動させない、1:メッシュ移動させる)
+0
 \end{lstlisting}
 
 \subsection{出力ファイル}
@@ -617,95 +1114,72 @@ cond.datのフォーマットの一例は以下の通り。"\#(ラベル) (変�
 \end{itemize}
 
 \subsection{解析実行手順}
+解析実行手順はREADME.mdにも記載しているためそちらも参照のこと。
+
 \subsubsection{入力ファイルの作成}
 
 utilディレクトリには入力ファイルを自動で作成可能なプログラムがあり、これら使うことで計算領域のメッシュファイルや境界条件ファイルを作成できる。
-以下に3次元の気泡上昇流れ問題のモデルの作成例を示す。
-\begin{lstlisting}[]
+
+\subsubsection{utilフォルダのプログラムのコンパイル}
+bbfe\_mlflow/util内の以下各フォルダ内に移動し、各フォルダ内のMakefileを実行しコンパイルする
+\begin{itemize}
+\item cmd2cond
+\item converters
+\item mesh
+\item meshgen
+\item surface
+\end{itemize}
+
+\subsubsection{シェルスクリプトによる入力ファイル生成}
+bbfe\_mlflow/util内のworkplaceフォルダに移動し、シェルスクリプトを実行することで入力ファイルが生成される。
+
+\begin{lstlisting}[caption = ダムブレイクの入力ファイル生成]
 #!/bin/bash
+./input_generator_dambreak_allslip.sh 40 6 40 0.584 0.00876 0.584 # x方向分割数 y方向分割数 z方向分割数 x方向領域長さ y方向領域長さ z方向領域長さ
+ls #Dambreak_allslip_40_6_40_0.584_0.00876_0.584のようなフォルダが作成され、中にnode.dat, elem.dat, levelset.dat, D_bc_v.datがあることを確認する
+cp Dambreak_allslip_40_6_40_0.584_0.00876_0.584/*.dat ../FE_solvers/mlflow_fs_sups/dambreak #mlflow_fs_sups下に解析用フォルダ（ここではdambreak）を作っておきそこにコピーする
+\end{lstlisting}
 
-cd ./util
-mkdir ./workspace/3d-bubble
-cd ./workspace/3d-bubble
+\begin{lstlisting}[caption = スロッシングの入力ファイル生成]
+#!/bin/bash
+./input_generator_sloshing_allslip.sh 40 8 48 1.0 0.2 1.2 # x方向分割数 y方向分割数 z方向分割数 x方向領域長さ y方向領域長さ z方向領域長さ
+ls #Sloshing_40_8_1.0_0.2_1.2のようなフォルダが作成され、中にnode.dat, elem.dat, levelset.dat, D_bc_v.datがあることを確認する
+cp Sloshing_40_8_1.0_0.2_1.2/*.dat ../FE_solvers/mlflow_fs_sups/sloshing #mlflow_fs_sups下に解析用フォルダ(ここではsloshing)を作っておきそこにコピーする
+\end{lstlisting}
 
-../../meshgen/meshgen_tet 1.0 1.0 2.0
-# -> node.dat と elem.dat を出力
-../../surface/surf_conn 1
-# -> surf.dat を出力
-
-# 流出境界部の圧力0の境界の切り出し
-../../mesh/mesh_surf_extract 0.0 0.0 2.0 1.0 1.0 2.0 -oe surf_p.dat -ov surf_p.vtk
-# noslip 境界部の切り出し
-../../mesh/mesh_surf_remove 0.0 0.0 2.0 1.0 1.0 2.0 -oe surf_v.dat -ov surf_v.vtk
-# 圧力の Dirichlet B.C. ファイルの作成
-../../surface/surf_dbc 1 0.0 -ie surf_p.dat -o D_bc_p.dat
-# 速度の Dirichlet B.C. ファイル (流入境界および slip 境界) を作成
-../../surface/surf_dbc 3 0.0 0.0 0.0 -ie surf_v.dat -o D_bc_v.dat
-
-# レベルセット関数のlevelset.dat ファイルの作成
-# 以下の引数6個はlevelset.datファイルの計算には使用しないため何でもよい。仮で0としている
-../../mesh/levelset_gen 0 0 0 0 0 0
-
-# 以上でnode.dat, elem.dat, D_bc_v.dat, D_bc_p.dat, levelset.datファイルが作成された
-# FE_solverディレクトリに移動し、計算実行フォルダを作成しその中にこれらの入力ファイルをコピーする
+\begin{lstlisting}[caption = 気泡上昇流れの入力ファイル生成]
+#!/bin/bash
+input_generator_3d_bubble_allslip.sh 25 25 50 1.0 1.0 2.0 # x方向分割数 y方向分割数 z方向分割数 x方向領域長さ y方向領域長さ z方向領域長さ
+ls #3d-bubble-allslip_25_25_50_1.0_1.0_2.0のようなフォルダが作成され、中にnode.dat, elem.dat, levelset.dat, D_bc_v.datがあることを確認する
+cp 3d-bubble-allslip_25_25_50_1.0_1.0_2.0/*.dat ../FE_solvers/mlflow_fs_sups/3d-bubble #mlflow_fs_sups下に解析用フォルダ(ここでは3d-bubble)を作っておきそこにコピーする
 \end{lstlisting}
 
 \subsubsection{解析実行}
 
-以下に解析実行例を示す。解析作業ディレクトリ（以下では"3d-bubble"）を作成し、そこに必要な入力ファイルを格納し、解析実行コマンドの引数に解析ディレクトリのパスを指定することで解析実行される。出力ファイルも解析作業ディレクトリに生成される。
+以下に解析実行例を示す。解析作業ディレクトリ（以下では"sloshing"）を作成し、そこに必要な入力ファイルを格納し、解析実行コマンドの引数に解析ディレクトリのパスを指定することで解析実行される。出力ファイルも解析作業ディレクトリに生成される。
 \begin{lstlisting}[]
 #!/bin/bash
-# 解析実行ディレクトリに移動
-cd ../../.../FE_solver/mlflow_fs
-# 入力データと出力データを入れるフォルダを作成
-mkdir 3d-bubble
-
-# 入力データを上記フォルダに格納する
-
-# 計算実行
-./mlflow_fs ./3d-bubble
+cd ./FE_solvers/mlflow_fs_sups
+make #コンパイル
+./mlflow_fs_sups ./sloshing #解析用フォルダ(sloshing)に結果ファイルが保存されていく
 \end{lstlisting}
 
 \subsection{並列化解析実行手順}
 
 以下にMPIを用いた並列化計算実行例を示す。
 並列化には領域分割法が使用されており、入力ファイルを分割する。入力ファイルの分割にはgedatsuを使用する。
-以下は並列数が2の場合のコマンドであり、並列数を変える場合は、引数で"2"としているところを希望する並列数に変更する。
+以下は並列数が4の場合のコマンドであり、並列数を変える場合は、引数で"4"としているところを希望する並列数に変更する。
 
 \begin{lstlisting}[]
 #!/bin/bash
-cd ../../.../FE_solver/mlflow_fs
+# node.dat と elem.dat を分割(例として領域分割数が4の場合)
+../../../submodule/monolis/bin/gedatsu_simple_mesh_partitioner -n 4
+# D_bc*.dat を分割
+../../../submodule/monolis/bin/gedatsu_bc_partitioner_R -n 4 -ig node.dat -i D_bc_v.dat
+# levelset.dat を分割
+../../../submodule/monolis/bin/gedatsu_dist_val_partitioner_R -ig node.dat -i levelset.dat -n 4
+# parted.0フォルダが作成されており、中に分割された入力ファイルが作成されていることを確認
 
-# node.datとelem.datを分割
-../../../submodule/monolis/bin/gedatsu_simple_mesh_partitioner -n 2
-# D_bc*.datを分割
-../../../submodule/monolis/bin/gedatsu_bc_partitioner_R -n 2 -ig node.dat -i D_bc_v.dat
-../../../submodule/monolis/bin/gedatsu_bc_partitioner_R -n 2 -ig node.dat -i D_bc_p.dat
-
-# levelset.datを分割
-../../../submodule/monolis/bin/gedatsu_dist_val_partitioner_R -ig node.dat -i levelset.dat -n 2
-
-# 並列計算実行
-mpirun -np 2 ./mlflow_fs ./damBreak-parallel/
-
-\end{lstlisting}
-
-\subsection{インプットファイルの作り方}
-
-\begin{lstlisting}[]
-# workspaceディレクトリで
-
-./input_generator_dambreak_allnoslip.sh 40 6 24 0.584 0.0876 0.3504
-
-./input_generator_dambreak_allnoslip.sh 80 2 60 0.584 0.0146 0.438
-
-\end{lstlisting}
-
-\begin{lstlisting}[]
-# workspaceディレクトリで
-
-./input_generator_3d_bubble_allnoslip 20 20 40 1.0 0.1 2.0
-
-./input_generator_3d_bubble_allnoslip 40 40 80 1.0 0.1 2.0
-
+# 並列計算実行. ここではdamBreak-parallelにparted.0が存在する場合
+mpirun -np 4 ./mlflow_fs ./damBreak-parallel/
 \end{lstlisting}

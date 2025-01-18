@@ -187,27 +187,34 @@
 	\label{fig:sloshing-result}
 \end{figure}
 
-\subsubsection{並列化解析結果}
-並列化解析で途中で収束しないエラーが起きている。
+\newpage
+\subsection{解析結果(並列化計算）}
+
+領域分割法による並列計算結果についても検証を行った。
+図~\ref{fig:3d-sloshing-mesh-parallel16}に領域分割数16の場合の計算メッシュの分割結果を示す。
+節点数は23571, 要素数は15360である。
 
 \begin{figure}[H]
     \centering
-	\includegraphics[width=15truecm]{pics/3d-sloshing/CN-dx0010/Error-parallel.png}
-	\caption{並列化エラー}
-	\label{fig:3d-sloshing-error-parallel}
+    \includegraphics[width=6truecm]{pics/3d-sloshing-parallel/mesh_parallel16.jpeg}
+	\caption{スロッシングの計算メッシュ（領域分割数16の場合）}
+	\label{fig:3d-sloshing-mesh-parallel16}
 \end{figure}
 
+図~\ref{fig:3d-sloshing-result-parallel}に並列数2,4, 8, 16の場合の計算結果を示す。
+並列数を変えた場合でも逐次計算の結果と一致した結果が得られた。
 
 \begin{figure}[H]
     \centering
-	\includegraphics[width=15truecm]{pics/3d-bubble/Error-parallel.png}
-	\caption{並列化エラー}
-	\label{fig:3d-sloshing-error-parallel}
+	\includegraphics[width=15truecm]{pics/3d-sloshing-parallel/sloshing_result_comparison_parallel.pdf}
+	\caption{スロッシング解析結果の左端の水位と参考文献\cite{Okamoto1992}, \cite{Sakuraba2001}との比較}
+	\label{fig:3d-sloshing-result-parallel}
 \end{figure}
 
+図~\ref{fig:3d-sloshing-parallel-speedup}に並列化による加速率効率のグラフを示す。
 \begin{figure}[H]
     \centering
-	\includegraphics[width=15truecm]{pics/3d-bubble/Error-parallel-NaN.png}
-	\caption{並列化エラー}
-	\label{fig:3d-sloshing-error-parallel}
+	\includegraphics[width=15truecm]{pics/3d-sloshing-parallel/sloshing_parallel_speedup.jpg}
+	\caption{スロッシング解析の並列化効率}
+	\label{fig:3d-sloshing-parallel-speedup}
 \end{figure}

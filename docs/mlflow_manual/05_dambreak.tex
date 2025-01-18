@@ -57,19 +57,18 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	\centering
 	\begin{minipage}[b]{0.49\columnwidth}
 	    \centering
-		\includegraphics[width=10truecm]{pics/3d-dambreak/mesh.jpeg}
+		\includegraphics[width=10truecm]{pics/3d-dambreak-parallel/mesh.jpeg}
 		\caption{ダムブレイクの計算メッシュ}
 		\label{fig:3d-dambreak-mesh}
 	\end{minipage}
 	\begin{minipage}[b]{0.49\columnwidth}
 	    \centering
-		\includegraphics[width=10truecm]{pics/3d-dambreak/heaviside_init.jpeg}
-		\caption{ダムブレイクの初期のレベルセット関数と境界条件。全面no-slip条件}
+		\includegraphics[width=10truecm]{pics/3d-dambreak-parallel/heaviside_init.jpeg}
+		\caption{ダムブレイクの初期のレベルセット関数と境界条件。全面slip条件}
 		\label{fig:3d-dambreak-boundary}
 	\end{minipage}
 \end{figure}
 
-\newpage
 \subsection{解析結果}
 
 \begin{figure}[H]
@@ -133,6 +132,7 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	\label{fig:3d-dambreak-result-comparison}
 \end{figure}
 
+\begin{comment}
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=4truecm]{pics/3d-dambreak/experiment_koshizuka1996.png}
@@ -140,6 +140,7 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	\label{fig:3d-dambreak-result-picture}
 \end{figure}
 
+\begin{comment}
 \subsection{体積保存を入れない場合の結果}
 
 \begin{figure}[H]
@@ -198,13 +199,18 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	\caption{ダムブレイクの結果(再初期化を入れない場合)}
 	\label{fig:dambreak-result}
 \end{figure}
+\end{comment}
 
-\subsection{高粘性流体のケース（コンクリートのビンガム流体を想定した事前検討）}
-
+\subsection{参考：高粘性流体のケース（コンクリートのビンガム流体を想定した事前検討）}
+今後ビンガム流体による解析を取り入れるにあたって、高粘性流体でも安定的に解析できるかどうかを事前検討として確認した。
 コンクリートの物性値は文献\cite{Saito2012}より、密度$\rho=3000\mathrm{kg/m^3}$、粘性係数は$\mu = 1 \mathrm{kg/(m\cdot s)}$と$\mu=1000 \mathrm{kg/(m\cdot s)}$の2パターンで確認した。
-どちらのケースでも水と空気のダムブレイクから物性値だけを変えた解析条件で安定に解析できた。
+どちらのケースでも水と空気のダムブレイクから物性値だけを変えた解析条件で安定に解析できたため、ビンガム流体に変更したときも不安定性が出る可能性は低いと考えられる。
 
-\subsubsection{$\mu = 1 \mathrm{kg/(m\cdot s)}$のケース}
+図\ref{fig:dambreak-result-visc1-1}と\ref{fig:dambreak-result-visc1-2}に$\mu = 1 \mathrm{kg/(m\cdot s)}$のケースの結果を、
+図\ref{fig:dambreak-result-visc1000-1}と\ref{fig:dambreak-result-visc1000-2}に$\mu = 1000 \mathrm{kg/(m\cdot s)}$のケースの結果を示す。
+
+図\ref{fig:3d-dambreak-concrete-reference}のビンガム流体の計算の参考文献の結果\cite{Saito2012}と比較すると、$\mu = 1000 \mathrm{kg/(m\cdot s)}$のケースの結果が近い動きをしており、ビンガム流体の計算の事前検討としては近い条件を模擬できていると考えられる。
+
 \begin{figure}[H]
 	\centering
 	\begin{minipage}[b]{0.19\columnwidth}
@@ -227,8 +233,8 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	    \centering
 	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0040.jpeg}
 	\end{minipage}
-	\caption{ダムブレイクの結果(粘性係数$\mu = 1 \mathrm{kg/(m\cdot s)}$の場合)}
-	\label{fig:dambreak-result-visc1}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1 \mathrm{kg/(m\cdot s)}$, $T=0 \sim 40$)}
+	\label{fig:dambreak-result-visc1-1}
 \end{figure}
 
 \begin{figure}[H]
@@ -253,12 +259,9 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	    \centering
 	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1/result_0090.jpeg}
 	\end{minipage}
-	\caption{ダムブレイクの結果(粘性係数$\mu = 1 \mathrm{kg/(m\cdot s)}$の場合)}
-	\label{fig:dambreak-result-visc1}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1 \mathrm{kg/(m\cdot s)}$, $T=50 \sim 90$)}
+	\label{fig:dambreak-result-visc1-2}
 \end{figure}
-
-
-\subsubsection{$\mu = 1000 \mathrm{kg/(m\cdot s)}$のケース}
 
 \begin{figure}[H]
 	\centering
@@ -282,8 +285,8 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	    \centering
 	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0040.jpeg}
 	\end{minipage}
-	\caption{ダムブレイクの結果(粘性係数$\mu = 1000 \mathrm{kg/(m\cdot s)}$の場合)}
-	\label{fig:dambreak-result-visc1000}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1000 \mathrm{kg/(m\cdot s)}$, $T=0 \sim 40$)}
+	\label{fig:dambreak-result-visc1000-1}
 \end{figure}
 
 \begin{figure}[H]
@@ -308,8 +311,8 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	    \centering
 	    \includegraphics[width=3.5truecm]{pics/3d-dambreak/viscosity1000/result_0090.jpeg}
 	\end{minipage}
-	\caption{ダムブレイクの結果(粘性係数$\mu = 1000 \mathrm{kg/(m\cdot s)}$の場合)}
-	\label{fig:dambreak-result-visc1000}
+	\caption{ダムブレイクの結果(粘性係数$\mu = 1000 \mathrm{kg/(m\cdot s)}$, $T=50 \sim 90$)}
+	\label{fig:dambreak-result-visc1000-2}
 \end{figure}
 
 
@@ -319,10 +322,6 @@ Figure \ref{fig:3d-dambreak-boundary}に初期状態のレベルセット関数�
 	\caption{ビンガム流体の計算の参考文献の結果\cite{Saito2012}}
 	\label{fig:3d-dambreak-concrete-reference}
 \end{figure}
-
-
-\subsection{並列解析結果}
-TBA
 
 \begin{comment}
 本ソルバーは領域分割法によるMPI並列化にも対応しているため、
@@ -352,3 +351,27 @@ Figure \ref{fig:3d-dambreak-parallel-result}に速度分布、圧力分布、レ
 ダムブレイクの検証\cite{Okumura2009}, 
 有名な文献\cite{Koshizuka1996}
 \end{comment}
+
+\newpage
+\subsection{解析結果(並列化計算）}
+
+領域分割法による並列計算結果についても検証を行った。
+図~\ref{fig:3d-dambreak-mesh-parallel16}に領域分割数16の場合の計算メッシュの分割結果を示す。
+節点数は19683, 要素数は12800である。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=6truecm]{pics/3d-dambreak-parallel/mesh_parallel16.jpeg}
+	\caption{ダムブレイクの計算メッシュ（領域分割数16の場合）}
+	\label{fig:3d-dambreak-mesh-parallel16}
+\end{figure}
+
+図~\ref{fig:3d-sloshing-result-parallel}に並列数2,4, 8, 16の場合の計算結果を示す。
+並列数を変えた場合でも逐次計算の結果と一致した結果が得られた。
+
+\begin{figure}[H]
+    \centering
+	\includegraphics[width=15truecm]{pics/3d-sloshing-parallel/sloshing_result_comparison_parallel.pdf}
+	\caption{スロッシング解析結果の左端の水位と参考文献\cite{Okamoto1992}, \cite{Sakuraba2001}との比較}
+	\label{fig:3d-sloshing-result-parallel}
+\end{figure}
