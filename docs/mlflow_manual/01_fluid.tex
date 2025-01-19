@@ -85,7 +85,7 @@ $\tau_{c}$は衝撃捕捉項の安定化パラメータであり、次式(\ref{s
 	- \bm{G}_P \bm{p}=\mathbf{0}
 \end{equation}
 
-
+\begin{comment}
 \subsection{離散化(Crank-Nicolson法とAdams-Bashforth法)}
 時間方向にCrank-Nicolson法を適用し、移流速度に対して2次精度Adams-Bashforth法を用いて線形化をすると、以下の式(\ref{fluid-matrix-CN1})が得られる。
 \begin{equation}
@@ -158,21 +158,21 @@ $\tau_{c}$は衝撃捕捉項の安定化パラメータであり、次式(\ref{s
 		\end{aligned}
 	\end{gathered}
 \end{equation}
+\end{comment}
 
-
-\subsection{離散化(Euler後退差分)}
+\subsection{離散化}
 時間方向、移流速度ともに陽的に前進差分で線形化をすると、以下の式(\ref{fluid-matrix-explicit1}),(\ref{fluid-matrix-explicit2})が得られる。
 \begin{equation}
 \label{fluid-matrix-explicit1}
-		\left\{M+M_S\right\} \frac{u_i^{n+1}-u_i^n}{\Delta t}
-		+ \left\{\bm{A}+\bm{A}_S + \bm{C}_{Si}\right\} u_i^{n+1}
+		\left\{\bm{M}+\bm{M}_S\right\} \frac{\bm{u}_i^{n+1}-\bm{u}_i^n}{\Delta t}
+		+ \left\{\bm{A}+\bm{A}_S + \bm{C}_{Si}\right\} \bm{u}_i^{n+1}
 		-\left\{\bm{G}_i-\bm{G}_{S i}\right\} \bm{p}^{n+1}
 		+\bm{D}_{i j} \bm{u}_j^{n+1}=0
 \end{equation}
 
 \begin{equation}
 \label{fluid-matrix-explicit2}
-		C_j u_j^{n+1}+M_{P j} \frac{u_j^{n+1}-\bm{u}_j^n}{\Delta t}
+		\bm{C}_j \bm{u}_j^{n+1}+\bm{M}_{P j} \frac{\bm{u}_j^{n+1}-\bm{u}_j^n}{\Delta t}
 		+\bm{A}_{P j} \bm{u}_j^{n+1}
 		+\bm{G}_P \bm{p}^{n+1}=0
 \end{equation}
@@ -233,3 +233,41 @@ $\tau_{c}$は衝撃捕捉項の安定化パラメータであり、次式(\ref{s
 		\end{aligned}
 	\end{gathered}
 \end{equation}
+%\end{comment}
+
+\subsection{ALE定式化}
+
+メッシュを移動させた場合の計算をするために、ALE定式化を実装した。
+式(\ref{fluid-ns}),(\ref{fluid-continuum})をALE形式に書き換えると式(\ref{fluid-ns-ALE}),(\ref{fluid-continuum-ALE})となる。
+\begin{equation}
+\label{fluid-ns-ALE}
+	\rho \left(
+	\frac{\partial \bm{u}}{\partial t} + \bm{\bar{u}} \cdot \nabla \bm{u}
+	\right) 
+	= - \nabla p + \mu \nabla^{2} \bm{u} + \bm{f}
+\end{equation}
+\begin{equation}
+\label{fluid-continuum-ALE}
+	\nabla \cdot u = 0
+\end{equation}
+ここで、$\bm{u}$は流速、$\bm{\bar{u}}=\bm{u}-\bm{\hat{u}}$は相対速度（$\bm{\hat{u}}$はメッシュ速度）、$\rho$は密度、$\bm{f}$は物体力である。
+
+
+式(\ref{fluid-GLS})をALE形式に書き換えると式(\ref{fluid-GLS-ALE})となる。
+\begin{equation}
+\label{fluid-GLS-ALE}
+	\begin{aligned} 
+		\int_{\Omega} w_i^h & \left(\frac{\partial u_i^h}{\partial t}+\bar{u}_j^h \frac{\partial u_i^h}{\partial x_j}\right) d \Omega
+		+ \int_{\Omega} \frac{\partial w_i^h}{\partial x_j}\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) d \Omega
+		+ \int_{\Omega} q^h \frac{\partial u_i^h}{\partial x_i} d \Omega \\ & 
+		+ \sum_{e=1}^M \int_{\Omega_e} \tau_m^e\left(\frac{\partial w_i^h}{\partial t}+\bar{u}_j^h \frac{\partial w_i^h}{\partial x_j}+\frac{\partial q^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 w_i^h}{\partial x_j^2}\right)\left(\frac{\partial u_i^h}{\partial t}+\bar{u}_j^h \frac{\partial u_i^h}{\partial x_j}+\frac{\partial p^h}{\partial x_i}-\frac{1}{R e} \frac{\partial^2 u_i^h}{\partial x_j^2}\right) d \Omega \\ & 
+		+ \sum_{e=1}^M \int_{\Omega_e} \tau_c^e\left(\frac{\partial w_i^h}{\partial x_i} \frac{\partial u_i^h}{\partial x_i}\right) d \Omega
+		= \int_{\Gamma_h} w_i^h\left(-p^h \delta_{i j}+\frac{1}{R e} \frac{\partial u_i^h}{\partial x_j}\right) n_j d \Gamma
+	\end{aligned}
+\end{equation}
+
+ALE形式の実装における変更点は、
+剛性行列と右辺ベクトルにおける移流項の速度を$\bm{\bar{u}}=\bm{u}-\bm{\hat{u}}$とする点と、
+スロッシングの問題でメッシュ固定の場合に与えていた加速度による慣性力項が不要になる点、
+速度のディリクレ境界条件をメッシュの移動速度に合わせて時間ごとに値を設定している点である。
+メッシュを移動させるALE形式で計算するかどうかは設定ファイル（cond.dat）のオプション（ale\_option）で設定変更できるように実装している。

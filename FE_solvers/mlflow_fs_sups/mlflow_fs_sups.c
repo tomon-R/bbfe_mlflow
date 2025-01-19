@@ -395,7 +395,7 @@ void output_mlflow_data_files(
 {
 	switch(sys->vals.output_option){
 		case 1:
-			output_result_dambreak_data(&(sys->fe), sys->vals.levelset, sys->cond.directory, t);
+			output_result_dambreak_data(&(sys->fe), &(sys->mono_com), sys->vals.levelset, sys->cond.directory, t);
 			break;
 		case 2:
 			output_result_bubble_data(&(sys->fe), &(sys->basis), &(sys->mono_com), sys->vals.v, sys->vals.heaviside, sys->cond.directory, t);
@@ -1025,7 +1025,7 @@ void set_element_vec_levelset_reinitialize(
 			levelset_ip[p]  = BBFE_std_mapping_scalar(nl, local_levelset, basis->N[p]);
 			levelset_ip_tmp[p]  = BBFE_std_mapping_scalar(nl, local_levelset_tmp, basis->N[p]);
 			//BBFE_std_mapping_vector3d(grad_phi_ip[p], nl, local_grad_phi, basis->N[p]);
-			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], np, local_levelset, fe->geo[e][p].grad_N);
+			BBFE_std_mapping_scalar_grad(grad_phi_ip[p], nl, local_levelset, fe->geo[e][p].grad_N);
 		}
 
 		for(int i=0; i<nl; i++) {
@@ -1682,7 +1682,6 @@ int main(
 
 			file_num += 1;
 		}
-
 	}
 
 	BBFE_fluid_finalize(&(sys.fe), &(sys.basis));

@@ -8,6 +8,7 @@ int compare(
 
 void output_result_dambreak_data(
 		BBFE_DATA* fe,
+		MONOLIS_COM* monolis_com,
 		double* levelset,
 		const char* directory,
 		double time);

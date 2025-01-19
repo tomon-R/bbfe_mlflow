@@ -138,7 +138,7 @@ Figure \ref{fig:3d-bubble-levelset_t0_3d}に初期状態のレベルセット関
 	\end{minipage}
 \end{figure}
 
-
+\begin{comment}
 \subsubsection{表面張力なしの解析結果}
 \begin{figure}[H]
 	\centering
@@ -222,6 +222,7 @@ Figure \ref{fig:3d-bubble-levelset_t0_3d}に初期状態のレベルセット関
 	\caption{3次元気泡上昇流れのレベルセット関数の分布の時間変化（Case1, $\sigma=24.5$、表面張力あり、体積保存あり、再初期化なし）}
 	\label{fig:3d-bubble_result_tc1}
 \end{figure}
+\end{comment}
 
 \newpage
 \subsection{解析結果(Case2, 表面張力の影響が小さいケース)}
@@ -274,4 +275,61 @@ Figure \ref{fig:3d-bubble-levelset_t0_3d}に初期状態のレベルセット関
 		\caption{上昇速度の時間変化(Case2)}
 		\label{fig:3d-bubble-velocity-tc2}
 	\end{minipage}
+\end{figure}
+
+\newpage
+\subsection{解析結果(並列化計算）}
+
+領域分割法による並列計算結果についても検証を行った。
+図~\ref{fig:3d-bubble-mesh-parallel16}に領域分割数16の場合の計算メッシュの分割結果を示す。
+節点数は34476, 要素数は31250である。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=6truecm]{pics/3d-bubble-parallel/mesh_parallel16.jpeg}
+	\caption{3次元気泡上昇流れの計算メッシュ(領域分割数16の場合)}
+	\label{fig:3d-bubble-mesh-parallel16}
+\end{figure}
+
+図~\ref{fig:3d-bubble-center-tc1-parallel}～~\ref{fig:3d-bubble-velocity-tc2-parallel}に並列数2,4, 8, 16の場合の計算結果を示す。
+並列数を変えた場合でも逐次計算の結果と一致した結果が得られた。
+
+\begin{figure}[H]
+	\centering
+	\begin{minipage}[b]{0.49\columnwidth}
+	    \centering
+	    \includegraphics[width=8truecm]{pics/3d-bubble-parallel/tc1_center_parallel_comparison.pdf}
+		\caption{重心位置の時間変化の並列数による比較(Case1)}
+		\label{fig:3d-bubble-center-tc1-parallel}
+	\end{minipage}
+	\begin{minipage}[b]{0.49\columnwidth}
+	    \centering
+	    \includegraphics[width=8truecm]{pics/3d-bubble-parallel/tc1_velocity_parallel_comparison.pdf}
+		\caption{上昇速度の時間変化の並列数による比較(Case1)}
+		\label{fig:3d-bubble-velocity-tc1-parallel}
+	\end{minipage}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\begin{minipage}[b]{0.49\columnwidth}
+	    \centering
+	    \includegraphics[width=8truecm]{pics/3d-bubble-parallel/tc2_center_parallel_comparison.pdf}
+		\caption{重心位置の時間変化の並列数による比較(Case2)}
+		\label{fig:3d-bubble-center-tc2-parallel}
+	\end{minipage}
+	\begin{minipage}[b]{0.49\columnwidth}
+	    \centering
+	    \includegraphics[width=8truecm]{pics/3d-bubble-parallel/tc2_velocity_parallel_comparison.pdf}
+		\caption{上昇速度の時間変化の並列数による比較(Case2)}
+		\label{fig:3d-bubble-velocity-tc2-parallel}
+	\end{minipage}
+\end{figure}
+
+図~\ref{fig:3d-sloshing-parallel-speedup}に並列化による加速率効率のグラフを示す。
+\begin{figure}[H]
+    \centering
+	\includegraphics[width=15truecm]{pics/3d-bubble-parallel/bubble_parallel_speedup.jpg}
+	\caption{気泡上昇解析の並列化効率}
+	\label{fig:3d-bubble-parallel-speedup}
 \end{figure}
