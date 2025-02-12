@@ -1,5 +1,5 @@
 
-#include <stdio.h>
+#include "vtk.h"
 
 void BB_vtk_void(){}
 
@@ -102,6 +102,24 @@ void BB_vtk_write_point_vals_vector(
 
 	for(int i=0; i<num_points; i++) {
 		fprintf(fp, "%e %e %e\n", val[i][0], val[i][1], val[i][2]);
+	}
+}
+
+/**********************************************************
+ * functions by bsfem
+ **********************************************************/
+
+void BB_vtk_write_elem_vals_scalar(
+		FILE*        fp,
+		double*      val,
+		const int    num_elems,
+		const char*  vtk_label)
+{
+	fprintf(fp, "SCALARS %s float\n", vtk_label);
+	fprintf(fp, "LOOKUP_TABLE default\n");
+
+	for(int i=0; i<num_elems; i++) {
+		fprintf(fp, "%e\n", val[i]);
 	}
 }
 

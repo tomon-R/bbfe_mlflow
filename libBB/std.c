@@ -1,6 +1,8 @@
 
 #include "std.h"
 
+static const char* CODENAME = "libBB/std >";
+
 /**********************************************************
  * functions for memory allocation
  **********************************************************/
@@ -509,4 +511,127 @@ void BB_std_free_2d_double_C(
 
 	free(array);
 	array = NULL;
+}
+
+/**********************************************************
+ * functions for file IO by bsfem
+ **********************************************************/
+
+void BB_std_read_file_pointer_get_val_1d_int(
+		FILE*       fp,
+		const int   num_values,
+		const int   buffer_size,
+		int*        val)
+{
+	for(int i=0; i<num_values; i++) {
+		BB_std_scan_line(&fp, buffer_size, "%d", &val[i]);
+	}
+}
+
+
+void BB_std_read_file_pointer_get_val_2d_double(
+		FILE*       fp,
+		const int   num_values1,
+		const int   num_values2,
+		double**    val)
+{
+	for(int i=0; i<num_values1; i++) {
+		for(int j=0; j<num_values2; j++) {
+			fscanf(fp, "%lf", &val[i][j]);
+		}
+	}
+}
+
+void BB_std_read_file_pointer_get_val_2d_int(
+		FILE*       fp,
+		const int   num_values1,
+		const int   num_values2,
+		int**       val)
+{
+	for(int i=0; i<num_values1; i++) {
+		for(int j=0; j<num_values2; j++) {
+			fscanf(fp, "%d", &val[i][j]);
+		}
+	}
+}
+
+void BB_std_read_file_pointer_get_val_3d_double(
+		FILE*       fp,
+		const int   num_values1,
+		const int   num_values2,
+		const int   num_values3,
+		double***    val)
+{
+	for(int i=0; i<num_values1; i++) {
+		for(int j=0; j<num_values2; j++) {
+			for(int k=0; k<num_values3; k++) {
+				fscanf(fp, "%lf", &val[i][j][k]);
+			}
+		}
+	}
+}
+
+int BB_std_read_file_pointer_get_num_nodes(
+		FILE*     fp,
+		const int buffer_size)
+{
+	int num_nodes;
+	BB_std_scan_line(&fp, buffer_size, "%d", &num_nodes);
+
+	return num_nodes;
+}
+
+int BB_std_read_file_pointer_get_num_elems(
+		FILE*       fp,
+		const int   num_nodes,
+		const int   buffer_size)
+{
+	int num_elems;  int local_num_nodes;
+
+	BB_std_scan_line(&fp, buffer_size, "%d %d",
+					&num_elems, &local_num_nodes);
+
+	if(local_num_nodes != num_nodes){
+		printf("%s WARNING: the num. of nodes is not correct. fem local_num_nodes = %d\n", CODENAME, local_num_nodes);
+		exit(0);
+	}
+
+	return num_elems;
+}
+
+
+void BB_std_read_file_pointer_get_num_distribution(
+		FILE*		fp,
+		const int	buffer_size,
+		int*		node_nums,
+		int* 		num_contains)
+{
+	char label[buffer_size];
+	BB_std_scan_line(
+			&fp, buffer_size, "%s", &label);
+	// read the number of distributions
+	int total_nums; int each_num_contains;
+	BB_std_scan_line(
+			&fp, buffer_size, "%d %d", &(total_nums), &(each_num_contains));
+	printf("%s distribution label \"%s\", Num total points = %d, Num. each point = %d.\n", CODENAME, label, total_nums, each_num_contains);
+	if( total_nums == 0 || each_num_contains == 0 ){
+		printf("%s WARNING: Label \"%s\", Num total points = %d, Num. each point = %d.\n", CODENAME, label, total_nums, each_num_contains);
+	}
+
+	*node_nums = total_nums;
+	*num_contains = each_num_contains;
+}
+
+
+int BB_std_search_max_contain_1d_int(
+		int*    array,
+		int     size)
+{
+	int max = array[0];
+	for(int i=0; i<size; i++){
+		if( max < array[i] ){
+			max = array[i];
+		}
+	}
+	return max;
 }

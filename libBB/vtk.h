@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdio.h>
 
 #define TYPE_VTK_VERTEX               1
 #define TYPE_VTK_POLY_VERTEX          2
@@ -65,3 +66,14 @@ void BB_vtk_write_point_vals_vector(
 		double**     val,
 		const int    num_points,
 		const char*  label);
+
+/**********************************************************
+ * functions by bsfem
+ **********************************************************/
+
+void BB_vtk_write_elem_vals_scalar(
+		FILE*        fp,
+		double*      val,
+		const int    num_elems,
+		const char*  vtk_label);
+

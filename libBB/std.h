@@ -170,3 +170,51 @@ void BB_std_free_2d_double_C(
 		double _Complex **   array,
 		const int            size1,
 		const int            size2);
+
+/**********************************************************
+ * functions for file IO by bsfem
+ **********************************************************/
+
+void BB_std_read_file_pointer_get_val_1d_int(
+		FILE*       fp,
+		const int   num_values,
+		const int   buffer_size,
+		int*        val);
+
+void BB_std_read_file_pointer_get_val_2d_double(
+		FILE*       fp,
+		const int   num_values1,
+		const int   num_values2,
+		double**    val);
+
+void BB_std_read_file_pointer_get_val_2d_int(
+		FILE*       fp,
+		const int   num_values1,
+		const int   num_values2,
+		int**       val);
+
+void BB_std_read_file_pointer_get_val_3d_double(
+		FILE*       fp,
+		const int   num_values1,
+		const int   num_values2,
+		const int   num_values3,
+		double***    val);
+
+int BB_std_read_file_pointer_get_num_nodes(
+		FILE*     fp,
+		const int buffer_size);
+
+int BB_std_read_file_pointer_get_num_elems(
+		FILE*       fp,
+		const int   num_nodes,
+		const int   buffer_size);
+
+void BB_std_read_file_pointer_get_num_distribution(
+		FILE*		fp,
+		const int	buffer_size,
+		int*		node_nums,
+		int* 		num_contains);
+
+int BB_std_search_max_contain_1d_int(
+		int*    array,
+		int     size);
