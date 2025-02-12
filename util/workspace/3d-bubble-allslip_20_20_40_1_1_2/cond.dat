@@ -5,11 +5,11 @@
 #mat_max_iter 1
 10000
 #time_spacing 1
-0.00025
+0.0025
 #finish_time 1
-1.2
+4
 #output_interval 1
-40
+50
 #density_l 1
 1000
 #density_g 1
@@ -21,7 +21,7 @@
 #gravity 3
 0.0
 0.0
--9.8
+-0.98
 #size_interface 1
 0.04
 #surf_tension_coef 1
@@ -29,7 +29,7 @@
 #dt_reinit 1
 1e-4
 #epsilon_reinit 1
-0.0438
+0.04
 #delta_reinit 1
 1e-4
 #alpha_reinit 1
