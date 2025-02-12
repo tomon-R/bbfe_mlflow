@@ -23,13 +23,13 @@
 0.0
 -0.98
 #size_interface 1
-0.10
+0.04
 #surf_tension_coef 1
 1.96
 #dt_reinit 1
 1e-4
 #epsilon_reinit 1
-0.10
+0.04
 #delta_reinit 1
 1e-4
 #alpha_reinit 1
